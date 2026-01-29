@@ -1,0 +1,17 @@
+CompileFlags:
+  CompilationDatabase: build/debug
+  # Force C mode for .h files (clangd sometimes guesses C++)
+  Remove:
+    - -stdlib=*
+
+Diagnostics:
+  MissingIncludes: Strict
+  UnusedIncludes: Strict
+
+Style:
+  QuotedHeaders: "src/.*"
+  AngledHeaders: ["cute_.*", "SDL3/.*"]
+
+# This is important for auto-includes
+Completion:
+  AllScopes: Yes

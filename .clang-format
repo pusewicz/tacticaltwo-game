@@ -1,0 +1,31 @@
+---
+BasedOnStyle: LLVM
+IndentWidth: 2
+Language: C
+Standard: Latest
+TabWidth: 2
+PointerAlignment: Left
+UseTab: Never
+ColumnLimit: 80 # Configured in .editorconfig
+
+# Include sorting/grouping
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<ext/.*\.h>'
+    Priority: 2
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: '^<.*\.h>'
+    Priority: 1
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: "^<.*"
+    Priority: 2
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: ".*"
+    Priority: 3
+    SortPriority: 0
+    CaseSensitive: false
+---

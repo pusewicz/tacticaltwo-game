@@ -1,0 +1,27 @@
+Checks: >
+  -*,
+  bugprone-*,
+  misc-include-cleaner,
+  readability-*,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-uppercase-literal-suffix,
+  portability-*,
+  -portability-avoid-pragma-once,
+
+# For C (not C++)
+CheckOptions:
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionIgnoredRegexp
+    value: "^(check|countof|ssizeof|COMP_TYPE_.*)$"
+
+WarningsAsErrors: ""
+HeaderFilterRegex: "^.*/src/.*$"
+FormatStyle: file
+UseColor: true
