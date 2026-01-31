@@ -42,6 +42,9 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
   cf_set_target_framerate(60);
   cf_app_set_vsync(false);
 
+  // Cornflower blue (6495ED) background
+  cf_clear_color(100.0f / 255.0f, 149.0f / 255.0f, 237.0f / 255.0f, 1.0f);
+
   if (cf_is_error(result)) {
     log_fatal("platform", "Failed to create app: %s", result.details);
     abort();
