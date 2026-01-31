@@ -27,7 +27,7 @@ end
 
 desc "Format C source files"
 task :format do
-  files = FileList["src/**/*.c", "src/**/*.h", "include/**/*.c", "include/**/*.h"]
+  files = FileList["src/**/*.c", "src/**/*.h"]
   sh "clang-format", "-i", *files unless files.empty?
 end
 
