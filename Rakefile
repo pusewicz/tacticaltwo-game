@@ -45,9 +45,8 @@ task watch: "cmake:configure" do
 
   listener = Listen.to("src", only: /\.(c|h)$/) do |modified, added, removed|
     puts "\nChanges detected, rebuilding game..."
-    notify("Building...")
     if system("ninja -C build/relwithdebinfo game")
-      notify("Build succeeded", sound: "Glass")
+      notify("Build succeeded")
     else
       notify("Build failed!", sound: "Basso")
     end
