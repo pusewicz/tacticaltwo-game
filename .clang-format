@@ -8,6 +8,9 @@ PointerAlignment: Left
 UseTab: Never
 ColumnLimit: 80 # Configured in .editorconfig
 
+# Alignment
+AlignConsecutiveAssignments: Consecutive
+
 # Include sorting/grouping
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup

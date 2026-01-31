@@ -17,8 +17,8 @@ void log_write(LogLevel level, const char* tag, const char* file, int line,
   // Map LogLevel to SDL_LogPriority
   static const SDL_LogPriority priorities[] = {
       [LOG_LEVEL_DEBUG] = SDL_LOG_PRIORITY_DEBUG,
-      [LOG_LEVEL_INFO] = SDL_LOG_PRIORITY_INFO,
-      [LOG_LEVEL_WARN] = SDL_LOG_PRIORITY_WARN,
+      [LOG_LEVEL_INFO]  = SDL_LOG_PRIORITY_INFO,
+      [LOG_LEVEL_WARN]  = SDL_LOG_PRIORITY_WARN,
       [LOG_LEVEL_ERROR] = SDL_LOG_PRIORITY_ERROR,
       [LOG_LEVEL_FATAL] = SDL_LOG_PRIORITY_CRITICAL,
   };

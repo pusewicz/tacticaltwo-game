@@ -174,13 +174,13 @@ void platform_end_frame(void) { cf_app_draw_onto_screen(true); }
 void platform_unload_game_library(GameLibrary* game_library) {
   cf_unload_shared_library(game_library->library);
   game_library->hot_reload = nullptr;
-  game_library->state = nullptr;
-  game_library->shutdown = nullptr;
-  game_library->render = nullptr;
-  game_library->update = nullptr;
-  game_library->init = nullptr;
-  game_library->library = nullptr;
-  game_library->ok = false;
+  game_library->state      = nullptr;
+  game_library->shutdown   = nullptr;
+  game_library->render     = nullptr;
+  game_library->update     = nullptr;
+  game_library->init       = nullptr;
+  game_library->library    = nullptr;
+  game_library->ok         = false;
 }
 
 bool platform_game_library_has_changed(GameLibrary* game_library) {
