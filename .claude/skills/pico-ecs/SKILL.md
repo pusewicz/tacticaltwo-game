@@ -1,5 +1,6 @@
 ---
-description: Use when working with ECS (Entity Component System), creating entities, components, systems, or game architecture using pico_ecs
+name: pico_ecs
+description: This skill should be used when the user asks to "create an entity", "add a component", "define a system", "set up ECS", "create entity factory", "register components", or works with Entity Component System architecture using pico_ecs library.
 ---
 
 # pico_ecs - Entity Component System
