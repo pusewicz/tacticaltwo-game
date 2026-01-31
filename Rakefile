@@ -31,3 +31,29 @@ task :format do
   sh "clang-format", "-i", *files unless files.empty?
 end
 
+def notify(message, title: "TacticalTwo", sound: nil)
+  return unless RUBY_PLATFORM.include?("darwin")
+
+  script = %(display notification "#{message}" with title "#{title}")
+  script += %( sound name "#{sound}") if sound
+  system("osascript", "-e", script)
+end
+
+desc "Watch src/ for changes and rebuild game library"
+task watch: "cmake:configure" do
+  require "listen"
+
+  listener = Listen.to("src", only: /\.(c|h)$/) do |modified, added, removed|
+    puts "\nChanges detected, rebuilding game..."
+    notify("Building...")
+    if system("ninja -C build/relwithdebinfo game")
+      notify("Build succeeded", sound: "Glass")
+    else
+      notify("Build failed!", sound: "Basso")
+    end
+  end
+
+  puts "Watching src/ for changes... (Ctrl+C to stop)"
+  listener.start
+  sleep
+end
