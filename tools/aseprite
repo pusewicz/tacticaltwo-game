@@ -1,0 +1,394 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Aseprite File Inspector
+#
+# Parses .ase/.aseprite files and extracts metadata including dimensions,
+# animation tags with durations, layer hierarchy, and slices.
+#
+# Output formats:
+#   --json      JSON for programmatic use
+#   --c-header  C preprocessor defines for tag names/frames
+#   (default)   Human-readable text
+#
+# File format specification:
+#   https://github.com/aseprite/aseprite/blob/main/docs/ase-file-specs.md
+
+require "optparse"
+require "English"
+
+class AsepriteFile
+  HEADER_MAGIC = 0xA5E0
+  FRAME_MAGIC = 0xF1FA
+
+  CHUNK_TYPES = {
+    0x0004 => :old_palette,
+    0x0011 => :old_palette,
+    0x2004 => :layer,
+    0x2005 => :cel,
+    0x2006 => :cel_extra,
+    0x2007 => :color_profile,
+    0x2008 => :external_files,
+    0x2016 => :mask,
+    0x2017 => :path,
+    0x2018 => :tags,
+    0x2019 => :palette,
+    0x2020 => :user_data,
+    0x2022 => :slice,
+    0x2023 => :tileset
+  }.freeze
+
+  LOOP_DIRECTIONS = {
+    0 => :forward,
+    1 => :reverse,
+    2 => :ping_pong,
+    3 => :ping_pong_reverse
+  }.freeze
+
+  attr_reader :width, :height, :frame_count, :color_depth, :tags, :layers, :slices,
+              :frame_durations, :total_duration_ms
+
+  def initialize(path)
+    @path = path
+    @tags = []
+    @layers = []
+    @slices = []
+    @frame_durations = []
+    parse
+    calculate_tag_durations
+  end
+
+  def tag_duration_ms(tag)
+    (tag[:from]..tag[:to]).sum { |i| @frame_durations[i] || 0 }
+  end
+
+  private
+
+  def parse
+    File.open(@path, "rb") do |f|
+      parse_header(f)
+      parse_frames(f)
+    end
+  end
+
+  def parse_header(f)
+    data = f.read(128)
+    raise "Invalid file: too short" if data.nil? || data.length < 128
+
+    @file_size = data[0, 4].unpack1("V")
+    magic = data[4, 2].unpack1("v")
+    raise "Invalid Aseprite file: bad magic (0x#{magic.to_s(16)})" unless magic == HEADER_MAGIC
+
+    @frame_count = data[6, 2].unpack1("v")
+    @width = data[8, 2].unpack1("v")
+    @height = data[10, 2].unpack1("v")
+    @color_depth = data[12, 2].unpack1("v")
+    @flags = data[14, 4].unpack1("V")
+    @transparent_index = data[28, 1].unpack1("C")
+    @palette_entries = data[32, 2].unpack1("v")
+    @palette_entries = 256 if @palette_entries == 0
+    @grid_x = data[36, 2].unpack1("s<")
+    @grid_y = data[38, 2].unpack1("s<")
+    @grid_width = data[40, 2].unpack1("v")
+    @grid_height = data[42, 2].unpack1("v")
+  end
+
+  def parse_frames(f)
+    @frame_count.times do |frame_index|
+      parse_frame(f, frame_index)
+    end
+  end
+
+  def parse_frame(f, frame_index)
+    frame_header = f.read(16)
+    return if frame_header.nil? || frame_header.length < 16
+
+    frame_size = frame_header[0, 4].unpack1("V")
+    magic = frame_header[4, 2].unpack1("v")
+    raise "Invalid frame #{frame_index}: bad magic" unless magic == FRAME_MAGIC
+
+    old_chunk_count = frame_header[6, 2].unpack1("v")
+    duration = frame_header[8, 2].unpack1("v")
+    @frame_durations[frame_index] = duration
+    new_chunk_count = frame_header[12, 4].unpack1("V")
+
+    chunk_count = new_chunk_count == 0 ? old_chunk_count : new_chunk_count
+
+    chunk_count.times do
+      parse_chunk(f)
+    end
+  end
+
+  def calculate_tag_durations
+    @total_duration_ms = @frame_durations.sum
+    @tags.each do |tag|
+      tag[:duration_ms] = tag_duration_ms(tag)
+    end
+  end
+
+  def parse_chunk(f)
+    chunk_header = f.read(6)
+    return if chunk_header.nil? || chunk_header.length < 6
+
+    chunk_size = chunk_header[0, 4].unpack1("V")
+    chunk_type = chunk_header[4, 2].unpack1("v")
+
+    data_size = chunk_size - 6
+    chunk_data = data_size > 0 ? f.read(data_size) : ""
+
+    case CHUNK_TYPES[chunk_type]
+    when :tags
+      parse_tags_chunk(chunk_data)
+    when :layer
+      parse_layer_chunk(chunk_data)
+    when :slice
+      parse_slice_chunk(chunk_data)
+    end
+  end
+
+  def parse_tags_chunk(data)
+    tag_count = data[0, 2].unpack1("v")
+    offset = 10 # 2 bytes count + 8 bytes reserved
+
+    tag_count.times do
+      from_frame = data[offset, 2].unpack1("v")
+      to_frame = data[offset + 2, 2].unpack1("v")
+      loop_dir = data[offset + 4, 1].unpack1("C")
+      repeat = data[offset + 6, 2].unpack1("v")
+      # 6 bytes reserved, 3 bytes RGB color, 1 byte extra
+      offset += 17
+
+      name_len = data[offset, 2].unpack1("v")
+      offset += 2
+      name = data[offset, name_len]
+      offset += name_len
+
+      @tags << {
+        name: name,
+        from: from_frame,
+        to: to_frame,
+        frames: to_frame - from_frame + 1,
+        direction: LOOP_DIRECTIONS[loop_dir] || :unknown,
+        repeat: repeat
+      }
+    end
+  end
+
+  def parse_layer_chunk(data)
+    flags = data[0, 2].unpack1("v")
+    type = data[2, 2].unpack1("v")
+    child_level = data[4, 2].unpack1("v")
+    blend_mode = data[10, 2].unpack1("v")
+    opacity = data[12, 1].unpack1("C")
+
+    name_len = data[16, 2].unpack1("v")
+    name = data[18, name_len]
+
+    layer_type = case type
+                 when 0 then :image
+                 when 1 then :group
+                 when 2 then :tilemap
+                 else :unknown
+                 end
+
+    @layers << {
+      name: name,
+      type: layer_type,
+      level: child_level,
+      visible: (flags & 0x01) != 0,
+      editable: (flags & 0x02) != 0,
+      opacity: opacity,
+      blend_mode: blend_mode
+    }
+  end
+
+  def parse_slice_chunk(data)
+    slice_count = data[0, 4].unpack1("V")
+    flags = data[4, 4].unpack1("V")
+    # reserved = data[8, 4]
+    name_len = data[12, 2].unpack1("v")
+    name = data[14, name_len]
+
+    @slices << {
+      name: name,
+      count: slice_count,
+      has_9_patch: (flags & 0x01) != 0,
+      has_pivot: (flags & 0x02) != 0
+    }
+  end
+end
+
+class AsepriteCLI
+  def initialize(args)
+    @options = { format: :text }
+    @files = parse_options(args)
+  end
+
+  def run
+    if @files.empty?
+      puts "Usage: #{$PROGRAM_NAME} [options] <file.ase> [file2.ase ...]"
+      exit 1
+    end
+
+    @files.each do |file|
+      inspect_file(file)
+    end
+  end
+
+  private
+
+  def parse_options(args)
+    parser = OptionParser.new do |opts|
+      opts.banner = "Usage: #{$PROGRAM_NAME} [options] <file.ase> [file2.ase ...]"
+
+      opts.on("-t", "--tags", "Show only tags") do
+        @options[:tags_only] = true
+      end
+
+      opts.on("-l", "--layers", "Show only layers") do
+        @options[:layers_only] = true
+      end
+
+      opts.on("-j", "--json", "Output as JSON") do
+        @options[:format] = :json
+      end
+
+      opts.on("-c", "--c-header", "Output tags as C header defines") do
+        @options[:format] = :c_header
+      end
+
+      opts.on("-h", "--help", "Show this help") do
+        puts opts
+        exit 0
+      end
+    end
+
+    parser.parse(args)
+  end
+
+  def format_duration(ms)
+    if ms >= 1000
+      "%.2fs" % (ms / 1000.0)
+    else
+      "#{ms}ms"
+    end
+  end
+
+  def inspect_file(path)
+    unless File.exist?(path)
+      warn "File not found: #{path}"
+      return
+    end
+
+    ase = AsepriteFile.new(path)
+
+    case @options[:format]
+    when :json
+      output_json(path, ase)
+    when :c_header
+      output_c_header(path, ase)
+    else
+      output_text(path, ase)
+    end
+  rescue StandardError => e
+    warn "Error parsing #{path}: #{e.message}"
+  end
+
+  def output_text(path, ase)
+    puts "=" * 60
+    puts "File: #{path}"
+    puts "=" * 60
+    puts "Dimensions: #{ase.width}x#{ase.height}"
+    puts "Frames: #{ase.frame_count}"
+    puts "Color depth: #{ase.color_depth} bpp"
+    puts "Total duration: #{format_duration(ase.total_duration_ms)}"
+    puts
+
+    unless @options[:layers_only]
+      puts "Tags (#{ase.tags.length}):"
+      if ase.tags.empty?
+        puts "  (none)"
+      else
+        ase.tags.each do |tag|
+          repeat_str = tag[:repeat] == 0 ? "infinite" : tag[:repeat].to_s
+          duration_str = format_duration(tag[:duration_ms])
+          puts "  - #{tag[:name]}: frames #{tag[:from]}-#{tag[:to]} (#{tag[:frames]} frames, #{duration_str}), #{tag[:direction]}, repeat: #{repeat_str}"
+        end
+      end
+      puts
+    end
+
+    unless @options[:tags_only]
+      puts "Layers (#{ase.layers.length}):"
+      if ase.layers.empty?
+        puts "  (none)"
+      else
+        ase.layers.each do |layer|
+          indent = "  " * (layer[:level] + 1)
+          visibility = layer[:visible] ? "" : " [hidden]"
+          puts "#{indent}- #{layer[:name]} (#{layer[:type]})#{visibility}"
+        end
+      end
+      puts
+    end
+
+    unless ase.slices.empty? || @options[:tags_only] || @options[:layers_only]
+      puts "Slices (#{ase.slices.length}):"
+      ase.slices.each do |slice|
+        puts "  - #{slice[:name]}"
+      end
+      puts
+    end
+  end
+
+  def output_json(path, ase)
+    require "json"
+
+    data = {
+      file: path,
+      width: ase.width,
+      height: ase.height,
+      frames: ase.frame_count,
+      color_depth: ase.color_depth,
+      total_duration_ms: ase.total_duration_ms,
+      tags: ase.tags,
+      layers: ase.layers,
+      slices: ase.slices
+    }
+
+    if @options[:tags_only]
+      data = { file: path, total_duration_ms: ase.total_duration_ms, tags: ase.tags }
+    elsif @options[:layers_only]
+      data = { file: path, layers: ase.layers }
+    end
+
+    puts JSON.pretty_generate(data)
+  end
+
+  def output_c_header(path, ase)
+    basename = File.basename(path, ".*").upcase.gsub(/[^A-Z0-9_]/, "_")
+
+    puts "// Generated from #{File.basename(path)}"
+    puts "// Dimensions: #{ase.width}x#{ase.height}, #{ase.frame_count} frames"
+    puts "// Total duration: #{ase.total_duration_ms}ms"
+    puts
+
+    if ase.tags.empty?
+      puts "// No tags defined"
+    else
+      ase.tags.each do |tag|
+        tag_name = tag[:name].upcase.gsub(/[^A-Z0-9_]/, "_")
+        puts "#define #{basename}_TAG_#{tag_name} \"#{tag[:name]}\""
+        puts "#define #{basename}_TAG_#{tag_name}_FROM #{tag[:from]}"
+        puts "#define #{basename}_TAG_#{tag_name}_TO #{tag[:to]}"
+        puts "#define #{basename}_TAG_#{tag_name}_FRAMES #{tag[:frames]}"
+        puts "#define #{basename}_TAG_#{tag_name}_DURATION_MS #{tag[:duration_ms]}"
+        puts
+      end
+    end
+  end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  AsepriteCLI.new(ARGV).run
+end
