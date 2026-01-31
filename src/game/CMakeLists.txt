@@ -2,6 +2,7 @@ set(NAME "game")
 
 add_library(${NAME} SHARED
   game.c
+  world.c
   ../engine/asset.c
   ../engine/log.c
 )

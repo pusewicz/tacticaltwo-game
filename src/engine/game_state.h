@@ -1,9 +1,10 @@
 #pragma once
 
-#include <cute_sprite.h>
+#include <cute_alloc.h>
+
+#include "world.h"
 
 typedef struct Platform Platform;
-typedef struct CF_Arena CF_Arena;
 
 typedef struct GameState {
   Platform* platform;
@@ -11,7 +12,7 @@ typedef struct GameState {
 
   bool debug_mode;
 
-  CF_Sprite player_sprite;
+  World world;
 } GameState;
 
 extern GameState* state;
