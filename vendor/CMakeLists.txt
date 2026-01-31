@@ -31,3 +31,7 @@ endif()
 ###
 
 FetchContent_MakeAvailable(cute)
+
+# Mark cute headers as system to suppress warnings
+get_target_property(CUTE_INCLUDE_DIRS cute INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(cute PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${CUTE_INCLUDE_DIRS}")

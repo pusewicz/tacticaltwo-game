@@ -40,8 +40,8 @@ foreach(target ${TARGETS})
         LOG_SOURCE_DIR="${PROJECT_SOURCE_DIR}/src/"
     )
 
-    target_include_directories(${target} PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
+    target_include_directories(${target} SYSTEM PRIVATE
+        ${PROJECT_SOURCE_DIR}/vendor/empyreanx
     )
 endforeach()
 
