@@ -14,6 +14,7 @@ C23 game using Cute Framework with hot-reloading support.
 - `src/engine/` - Engine utilities (logging, state)
 - `src/config/` - Configuration constants
 - `src/platform/` - Platform abstraction (Cute Framework)
+- `include/` - Header-only third-party libraries (pico_ecs)
 - `vendor/` - Third-party dependencies
 - `assets/` - Game assets (mounted at `/assets` in CF filesystem)
 
