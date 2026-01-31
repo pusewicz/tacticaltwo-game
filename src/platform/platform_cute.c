@@ -4,6 +4,7 @@
 #include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_stdinc.h>
 #include <cute_app.h>
+#include <cute_defines.h>
 #include <cute_file_system.h>
 #include <cute_result.h>
 #include <cute_symbol.h>
@@ -11,6 +12,7 @@
 #include <stddef.h>
 
 #include "../engine/log.h"
+#include "config.h"
 #if __has_include(<_abort.h>)
 #include <_abort.h>
 #elif __has_include(<stdlib.h>)
@@ -33,7 +35,8 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
 
   int options = 0;
   CF_Result result =
-      cf_make_app("Wasteland", 0, 0, 0, 1280, 720, options, argv[0]);
+      cf_make_app("TacticalTwo", 0, 0, 0, CANVAS_WIDTH * CANVAS_SCALE,
+                  CANVAS_HEIGHT * CANVAS_SCALE, options, argv[0]);
 
   cf_set_fixed_timestep(60);
   cf_set_target_framerate(60);
