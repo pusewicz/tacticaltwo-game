@@ -17,6 +17,9 @@ C23 game using Cute Framework with hot-reloading support.
 - `ninja: no work to do.` means the build succeeded - all targets are up-to-date
   - Do NOT retry or attempt to "fix" this message
   - This is normal when `rake watch` has already rebuilt, or when no source files changed
+- **NEVER remove `build/` directories** unless the user explicitly asks
+  - Deleting build directories causes lengthy full rebuilds
+  - Build errors do NOT require deleting the build directory
 
 ## Project Structure
 - `src/app/` - Main executable (platform loader)
@@ -24,8 +27,7 @@ C23 game using Cute Framework with hot-reloading support.
 - `src/engine/` - Engine utilities (logging, state)
 - `src/config/` - Configuration constants
 - `src/platform/` - Platform abstraction (Cute Framework)
-- `include/` - Header-only third-party libraries (pico_ecs)
-- `vendor/` - Third-party dependencies
+- `vendor/` - Third-party dependencies (includes `empyreanx/pico_ecs.h`)
 - `assets/` - Game assets (mounted at `/assets` in CF filesystem)
 - `tools/` - Development tools
   - `aseprite` - Inspect .ase files (tags, layers, durations). Use `--json` or `--c-header` for output formats.
