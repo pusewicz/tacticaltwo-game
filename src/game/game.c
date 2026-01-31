@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../config/config.h"
+#include "../engine/asset.h"
 #include "../engine/game_state.h"
 #include "../engine/platform.h"
 
@@ -27,6 +29,8 @@ EXPORT void game_init(Platform* platform) {
   state->scratch_arena = malloc(sizeof(CF_Arena));
   *state->scratch_arena = cf_make_arena(_Alignof(void*), CF_MB * 4);
 
+  asset_load_sprite("assets/sprites/player.ase", &state->player_sprite);
+
   cf_app_init_imgui();
 }
 
@@ -37,10 +41,15 @@ bool game_update(void) {
     state->debug_mode = !state->debug_mode;
   }
 
+  cf_sprite_update(&state->player_sprite);
+
   return true;
 }
 
-void game_render(void) {}
+void game_render(void) {
+  cf_draw_scale(CANVAS_SCALE, CANVAS_SCALE);
+  cf_draw_sprite(&state->player_sprite);
+}
 
 EXPORT void game_shutdown(void) {
   free(state->scratch_arena);

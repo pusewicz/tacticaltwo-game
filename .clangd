@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: build/debug
+  CompilationDatabase: build/relwithdebinfo
   # Force C mode for .h files (clangd sometimes guesses C++)
   Remove:
     - -stdlib=*

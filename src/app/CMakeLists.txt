@@ -1,12 +1,13 @@
 set(NAME "TacticalTwo")
 
-add_executable(${NAME} WIN32 MACOSX_BUNDLE 
+add_executable(${NAME} WIN32 MACOSX_BUNDLE
   main.c
+  ../engine/log.c
   ../platform/platform_cute.c
 )
 
 target_include_directories(${NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(${NAME} PRIVATE engine cute)
+target_link_libraries(${NAME} PRIVATE config cute)
 
 if(ENABLE_HOT_RELOADING)
   target_compile_definitions(${NAME} PRIVATE ENGINE_HOT_RELOADING)

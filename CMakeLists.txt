@@ -20,7 +20,7 @@ add_subdirectory(vendor)
 add_subdirectory(src)
 
 # Common compile settings for all project targets
-set(TARGETS engine game TacticalTwo)
+set(TARGETS game TacticalTwo)
 foreach(target ${TARGETS})
     target_compile_features(${target} PRIVATE c_std_23)
 
@@ -32,12 +32,16 @@ foreach(target ${TARGETS})
     )
 
     target_compile_definitions(${target} PRIVATE
-        $<$<CONFIG:Debug>:DEBUG>
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:DEBUG>
         $<$<CONFIG:Release>:RELEASE>
         $<$<PLATFORM_ID:Windows>:PLATFORM_WINDOWS>
         $<$<PLATFORM_ID:Linux>:PLATFORM_LINUX>
         $<$<PLATFORM_ID:Darwin>:PLATFORM_MACOS>
         LOG_SOURCE_DIR="${PROJECT_SOURCE_DIR}/src/"
+    )
+
+    target_include_directories(${target} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
     )
 endforeach()
 
