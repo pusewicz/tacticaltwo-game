@@ -122,12 +122,14 @@ typedef struct C_PlayerController {
   CF_V2 facing_direction; // Normalized, (1,0) = right
 } C_PlayerController;
 
-// C_PlayerState - Simple state machine
+// C_PlayerState - Stackless coroutine state machine
 // Tracks current player state for animation and behavior selection.
+// Uses Duff's Device pattern for resumable execution.
 typedef struct C_PlayerState {
   PlayerState current;
   PlayerState previous;
   float state_timer;
+  int coroutine_line; // Tracks execution position for coroutine resume
 } C_PlayerState;
 
 // C_Transform - Position and rotation

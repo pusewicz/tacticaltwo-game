@@ -1,131 +1,191 @@
-# Animation State Machine Refactoring
+# Animation State Machine Refactoring - Stackless Coroutines
 
 ## Overview
 
-This document explains the refactoring of the animation system in `world.c` to use a switch-based state machine pattern, as inspired by [Slembcke's blog post on State Machines](https://www.slembcke.net/blog/StateMachines/).
+This document explains the refactoring of the animation system in `world.c` to use stackless coroutines with Duff's Device, as described in [Slembcke's blog post on State Machines](https://www.slembcke.net/blog/StateMachines/).
 
-## Problem
+## What is a Stackless Coroutine?
 
-The original animation system had scattered logic with multiple if-statements checking for various states:
+A stackless coroutine is a function that can suspend execution and later resume from the same point. Unlike traditional functions, coroutines can "yield" control back to the caller and maintain their execution state between calls.
+
+The implementation uses **Duff's Device** - a clever C technique that combines switch statements with macros to create resumable execution points.
+
+## Coroutine Macros
 
 ```c
-// Old approach - scattered if-statements
-const char* anim_name = state_to_animation(ps->current);
+#define COROUTINE_BEGIN(state_var) \
+  switch (state_var) {             \
+  case 0:
 
-if (ps->current == PLAYER_STATE_FIRING) {
-  if (cf_sprite_is_playing(...)) {
-    anim_name = nullptr;
-  } else {
-    // logic
-  }
-}
+#define COROUTINE_YIELD(state_var) \
+  do {                             \
+    state_var = __LINE__;          \
+    return 0;                      \
+  case __LINE__:;                  \
+  } while (0)
 
-if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-  // more logic
-}
+#define COROUTINE_END \
+  }                   \
+  return 0
+```
 
-// Later in the function...
-if (ps->state_timer > 0.0f && (ps->current == PLAYER_STATE_RELOADING || ...)) {
-  // transition logic
+These macros work together:
+- `COROUTINE_BEGIN`: Initializes the switch statement that dispatches to the saved execution point
+- `COROUTINE_YIELD`: Saves the current line number and returns, resuming at that line on next call
+- `COROUTINE_END`: Closes the coroutine
+
+## Benefits of This Approach
+
+### 1. **Trivial Serialization**
+The entire animation state can be saved/loaded by simply saving the component struct:
+```c
+struct C_PlayerState {
+  PlayerState current;
+  PlayerState previous;
+  float state_timer;
+  int coroutine_line;  // Execution position
 }
 ```
 
-This approach had several issues:
-- **Scattered logic**: State-specific behavior was spread across multiple if-statements
-- **Hard to follow**: State transitions weren't clearly visible
-- **Difficult to maintain**: Adding new states required modifying multiple locations
+Save/load is just a memory copy - no special handling needed!
 
-## Solution: Switch-Based State Machine
+### 2. **Zero Memory Overhead**
+No stack frames, no heap allocations. The coroutine state is just an integer tracking the execution line.
 
-The refactored code uses a switch statement where each case handles a specific state's:
-1. **Entry behavior** - What animation to play when entering the state
-2. **Update behavior** - Per-frame logic for that state
-3. **Exit behavior** - Conditions and transitions to other states
+### 3. **Manual Variable Persistence**
+All variables that need to survive across yields must be stored in the component struct. This makes state management explicit and predictable.
+
+## Example: Firing State Coroutine
 
 ```c
-switch (ps->current) {
-case PLAYER_STATE_IDLE:
-  // Entry: play aim animation
-  if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
-    cf_sprite_play(sprite_comp, "GunAim");
-  }
-  break;
-
-case PLAYER_STATE_FIRING:
-  // Entry: select appropriate fire animation
+static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
+                            C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_line);
+  
+  // Entry: Select appropriate fire animation
   if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
       !cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-    bool moving       = velocity->x != 0.0f;
-    const char* anim  = moving ? "GunWalkFire" : "GunFire";
-    cf_sprite_play(sprite_comp, anim);
+    bool moving = velocity->x != 0.0f;
+    cf_sprite_play(sprite_comp, moving ? "GunWalkFire" : "GunFire");
   }
-
-  // Exit: transition when animation completes
-  if (ps->state_timer > 0.0f) {
-    bool should_finish = /* ... */;
-    if (should_finish) {
+  
+  // Wait one frame
+  COROUTINE_YIELD(ps->coroutine_line);
+  
+  // Wait for animation to complete
+  while (ps->state_timer > 0.0f) {
+    if (animation_should_finish(sprite_comp)) {
       ps->current = PLAYER_STATE_IDLE;
+      ps->coroutine_line = 0;
+      COROUTINE_END;
     }
+    COROUTINE_YIELD(ps->coroutine_line);
   }
-  break;
-
-// ... other states
+  
+  COROUTINE_END;
 }
 ```
 
-## Benefits
+**Execution flow:**
+1. **First call**: Plays animation, hits `COROUTINE_YIELD`, saves line number and returns
+2. **Second call**: Resumes after first yield, checks animation state
+3. **Subsequent calls**: Keep looping until animation completes
+4. **On completion**: Transitions to IDLE and resets coroutine
 
-### 1. **Clear State Encapsulation**
-Each state's logic is contained within its own case block. You can see at a glance what happens in each state without scanning the entire function.
+## State Handlers
 
-### 2. **Explicit Transitions**
-State transitions are now clearly visible within each state case. For example:
-- `PLAYER_STATE_FIRING` → `PLAYER_STATE_IDLE` when animation completes
-- `PLAYER_STATE_CROUCH_FIRING` → `PLAYER_STATE_CROUCHING` when animation completes
-- `PLAYER_STATE_RELOADING` → `PLAYER_STATE_IDLE` when animation completes
+Each animation state is now a separate coroutine function:
 
-### 3. **Easy to Extend**
-Adding a new state is straightforward:
-1. Add a new case to the switch statement
-2. Implement entry, update, and exit logic within that case
-3. Done!
+### Simple States (Loop Forever)
+- **IDLE**: `anim_state_idle()` - Plays "GunAim" and yields forever
+- **WALKING**: `anim_state_walking()` - Plays "GunWalk" and yields forever
+- **CROUCHING**: `anim_state_crouching()` - Plays "GunCrouch" and yields forever
 
-### 4. **Better Locality**
-All logic for a specific state is in one place. This makes debugging easier and reduces the chance of forgetting to update related code when modifying a state.
+### Complex States (With Completion)
+- **FIRING**: `anim_state_firing()` - Plays fire animation, waits for completion, transitions to IDLE
+- **CROUCH_FIRING**: `anim_state_crouch_firing()` - Plays crouch fire animation, transitions to CROUCHING
+- **RELOADING**: `anim_state_reloading()` - Plays reload animation, transitions to IDLE
 
-## State Descriptions
+## How It Works
 
-### Simple States (No Transitions)
-- **IDLE**: Plays "GunAim" animation, loops indefinitely
-- **WALKING**: Plays "GunWalk" animation, loops indefinitely
-- **CROUCHING/CROUCH_WALKING**: Plays "GunCrouch" animation, loops indefinitely
+### State Transitions
+When a state change occurs:
+1. `sys_update_player_state` sets `ps->current` to the new state
+2. `ps->coroutine_line` is reset to 0
+3. Next frame, the new coroutine starts from the beginning
 
-### Complex States (With Transitions)
-- **FIRING**: 
-  - Entry: Selects "GunFire" or "GunWalkFire" based on velocity
-  - Exit: Transitions to IDLE when animation completes
-  - Special: "GunWalkFire" only plays 4 of 8 frames
-
-- **CROUCH_FIRING**:
-  - Entry: Plays "GunCrouchFire" animation
-  - Exit: Transitions to CROUCHING when animation completes
-
-- **RELOADING**:
-  - Entry: Plays "GunReload" animation
-  - Exit: Transitions to IDLE when animation completes
+### Execution Resume
+Each frame:
+1. `sys_update_animation` calls the appropriate coroutine handler
+2. The switch statement jumps to the saved line number
+3. Coroutine executes until next `YIELD` or completion
+4. Execution state is automatically saved in `coroutine_line`
 
 ## Changes Made
 
-### Removed
-- `state_to_animation()` helper function - no longer needed as animation selection is per-state
+### Added to `C_PlayerState`
+```c
+int coroutine_line; // Tracks execution position for coroutine resume
+```
 
-### Modified
-- `sys_update_animation()` - completely refactored to use switch-based state machine
+### Added Coroutine Macros
+- `COROUTINE_BEGIN` - Start coroutine
+- `COROUTINE_YIELD` - Yield execution
+- `COROUTINE_END` - End coroutine
 
-### Added
-- Clear per-state logic within switch cases
-- Inline comments explaining entry/exit behavior for each state
-- Default case for unknown states (safety fallback)
+### Refactored Animation System
+- Created separate coroutine handler for each state
+- Each handler is fully resumable across frames
+- State transitions explicitly reset coroutine position
+
+### Updated State Management
+- `sys_update_player_state` resets `coroutine_line` on state change
+- `make_player` initializes `coroutine_line` to 0
+
+## Comparison: Before vs After
+
+### Before (Simple Switch)
+```c
+switch (ps->current) {
+case PLAYER_STATE_FIRING:
+  if (!cf_sprite_is_playing(...)) {
+    cf_sprite_play(...);
+  }
+  if (ps->state_timer > 0.0f && should_finish) {
+    ps->current = PLAYER_STATE_IDLE;
+  }
+  break;
+}
+```
+
+**Issues:**
+- State logic runs every frame from the start
+- No resumable execution
+- Can't easily express "wait for X frames"
+
+### After (Stackless Coroutine)
+```c
+static int anim_state_firing(...) {
+  COROUTINE_BEGIN(ps->coroutine_line);
+  
+  // Setup
+  cf_sprite_play(...);
+  COROUTINE_YIELD(ps->coroutine_line);
+  
+  // Wait for completion
+  while (!should_finish) {
+    COROUTINE_YIELD(ps->coroutine_line);
+  }
+  
+  ps->current = PLAYER_STATE_IDLE;
+  COROUTINE_END;
+}
+```
+
+**Benefits:**
+- Resumable execution - picks up where it left off
+- Clear sequential flow - reads like synchronous code
+- Easy to express "wait" logic with yields
 
 ## Testing
 
@@ -144,15 +204,29 @@ To test:
    - Reload (R key)
    - Combinations (crouch + fire, walk + fire)
 
-## Future Improvements
+## Serialization Example
 
-The switch-based state machine provides a solid foundation for future enhancements:
-- Add new animation states easily
-- Implement state entry/exit callbacks if needed
-- Add state-specific timers or counters
-- Support more complex state transitions
+To save game state, simply serialize the component:
+
+```c
+// Save
+fwrite(&ps->current, sizeof(PlayerState), 1, file);
+fwrite(&ps->previous, sizeof(PlayerState), 1, file);
+fwrite(&ps->state_timer, sizeof(float), 1, file);
+fwrite(&ps->coroutine_line, sizeof(int), 1, file);
+
+// Load
+fread(&ps->current, sizeof(PlayerState), 1, file);
+fread(&ps->previous, sizeof(PlayerState), 1, file);
+fread(&ps->state_timer, sizeof(float), 1, file);
+fread(&ps->coroutine_line, sizeof(int), 1, file);
+
+// Animation system will resume at the exact point it was saved!
+```
 
 ## References
 
 - [State Machines in C - Slembcke.net](https://www.slembcke.net/blog/StateMachines/)
+- [Coroutines in C - Simon Tatham](https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html)
+- [Duff's Device - Wikipedia](https://en.wikipedia.org/wiki/Duff%27s_device)
 - Original implementation: `world.c` (before refactoring)
