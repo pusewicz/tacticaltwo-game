@@ -24,7 +24,7 @@
 
 #define COROUTINE_BEGIN(state_var) \
   switch (state_var) {             \
-  case 0:
+  case 0:;
 
 #define COROUTINE_YIELD(state_var) \
   do {                             \
@@ -215,7 +215,8 @@ static int anim_state_idle(C_Sprite* sprite_comp, C_PlayerState* ps,
     cf_sprite_play(sprite_comp, "GunAim");
   }
   
-  // Loop forever - idle has no completion
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
   while (true) {
     COROUTINE_YIELD(ps->coroutine_line);
   }
@@ -233,7 +234,8 @@ static int anim_state_walking(C_Sprite* sprite_comp, C_PlayerState* ps,
     cf_sprite_play(sprite_comp, "GunWalk");
   }
   
-  // Loop forever - walking has no completion
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
   while (true) {
     COROUTINE_YIELD(ps->coroutine_line);
   }
@@ -251,7 +253,8 @@ static int anim_state_crouching(C_Sprite* sprite_comp, C_PlayerState* ps,
     cf_sprite_play(sprite_comp, "GunCrouch");
   }
   
-  // Loop forever - crouching has no completion
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
   while (true) {
     COROUTINE_YIELD(ps->coroutine_line);
   }
@@ -287,9 +290,8 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
     }
     
     if (should_finish) {
-      // Transition to IDLE
+      // Transition to IDLE (coroutine_line reset by sys_update_player_state)
       ps->current = PLAYER_STATE_IDLE;
-      ps->coroutine_line = 0; // Reset for next state
       COROUTINE_END;
     }
     
@@ -317,9 +319,8 @@ static int anim_state_crouch_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
     COROUTINE_YIELD(ps->coroutine_line);
   }
   
-  // Transition to CROUCHING
+  // Transition to CROUCHING (coroutine_line reset by sys_update_player_state)
   ps->current = PLAYER_STATE_CROUCHING;
-  ps->coroutine_line = 0; // Reset for next state
   
   COROUTINE_END;
 }
@@ -342,9 +343,8 @@ static int anim_state_reloading(C_Sprite* sprite_comp, C_PlayerState* ps,
     COROUTINE_YIELD(ps->coroutine_line);
   }
   
-  // Transition to IDLE
+  // Transition to IDLE (coroutine_line reset by sys_update_player_state)
   ps->current = PLAYER_STATE_IDLE;
-  ps->coroutine_line = 0; // Reset for next state
   
   COROUTINE_END;
 }

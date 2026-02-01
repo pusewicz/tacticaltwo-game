@@ -74,9 +74,16 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f) {
-    if (animation_should_finish(sprite_comp)) {
+    bool should_finish = false;
+    if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+      should_finish = cf_sprite_current_frame(sprite_comp) >= 
+                      GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME;
+    } else {
+      should_finish = cf_sprite_will_finish(sprite_comp);
+    }
+    
+    if (should_finish) {
       ps->current = PLAYER_STATE_IDLE;
-      ps->coroutine_line = 0;
       COROUTINE_END;
     }
     COROUTINE_YIELD(ps->coroutine_line);
