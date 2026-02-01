@@ -7,6 +7,8 @@
 
 #include "world.h"
 
+#include "../engine/coro.h"
+
 #include <cute_draw.h>
 #include <cute_hashtable.h>
 #include <cute_input.h>
@@ -196,86 +198,106 @@ static ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
 // System: Update Animation
 // =============================================================================
 // Maps player state to animation and updates sprite.
+// Uses coroutines for one-shot animations (fire, reload) to keep logic linear.
 
-// NOLINTBEGIN
+// Animation coroutine: standing fire sequence
+// Picks walk-fire or stand-fire based on velocity at fire start.
+static void anim_fire(C_PlayerState* ps, C_Sprite* sprite, C_Velocity* vel) {
+  coro_begin(ps);
+
+  // Pick animation based on movement at fire start
+  ps->anim_name = (vel->x != 0.0f) ? "GunWalkFire" : "GunFire";
+  cf_sprite_play(sprite, ps->anim_name);
+
+  // Wait for animation to complete
+  // GunWalkFire has 8 frames but we only want 4 (one shot cycle)
+  if (vel->x != 0.0f) {
+    coro_wait(ps, cf_sprite_current_frame(sprite) >= 3);
+  } else {
+    coro_wait(ps, cf_sprite_will_finish(sprite));
+  }
+
+  // Transition back to idle
+  ps->current = PLAYER_STATE_IDLE;
+
+  coro_end(ps);
+}
+
+// Animation coroutine: crouched fire sequence
+static void anim_crouch_fire(C_PlayerState* ps, C_Sprite* sprite) {
+  coro_begin(ps);
+
+  ps->anim_name = "GunCrouchFire";
+  cf_sprite_play(sprite, ps->anim_name);
+
+  coro_wait(ps, cf_sprite_will_finish(sprite));
+
+  ps->current = PLAYER_STATE_CROUCHING;
+
+  coro_end(ps);
+}
+
+// Animation coroutine: reload sequence
+static void anim_reload(C_PlayerState* ps, C_Sprite* sprite) {
+  coro_begin(ps);
+
+  ps->anim_name = "GunReload";
+  cf_sprite_play(sprite, ps->anim_name);
+
+  coro_wait(ps, cf_sprite_will_finish(sprite));
+
+  ps->current = PLAYER_STATE_IDLE;
+
+  coro_end(ps);
+}
+
 static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
                                       ecs_entity_t* entities, size_t count,
                                       [[maybe_unused]] void* udata) {
   for (size_t i = 0; i < count; i++) {
-    auto sprite_comp = ECS_GET(entities[i], C_Sprite);
-    auto ps          = ECS_GET(entities[i], C_PlayerState);
-    auto controller  = ECS_GET(entities[i], C_PlayerController);
-    auto velocity    = ECS_GET(entities[i], C_Velocity);
+    auto sprite     = ECS_GET(entities[i], C_Sprite);
+    auto ps         = ECS_GET(entities[i], C_PlayerState);
+    auto controller = ECS_GET(entities[i], C_PlayerController);
+    auto velocity   = ECS_GET(entities[i], C_Velocity);
 
-    // Get animation name for current state
-    const char* anim_name = state_to_animation(ps->current);
+    // Reset coroutine when entering a new state
+    if (ps->current != ps->previous) {
+      coro_reset(ps);
+    }
 
-    // Use walk+fire animation if firing while moving
-    // Only pick fire animation at start of firing (don't switch mid-animation)
-    if (ps->current == PLAYER_STATE_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunFire") ||
-          cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        // Already in firing animation - don't change it
-        anim_name = nullptr;
-      } else {
-        // Just started firing - pick animation based on current velocity
-        bool moving = velocity->x != 0.0f;
-        anim_name   = moving ? "GunWalkFire" : "GunFire";
+    // Dispatch to animation handler based on state
+    switch (ps->current) {
+    case PLAYER_STATE_FIRING:
+      anim_fire(ps, sprite, velocity);
+      break;
+
+    case PLAYER_STATE_CROUCH_FIRING:
+      anim_crouch_fire(ps, sprite);
+      break;
+
+    case PLAYER_STATE_RELOADING:
+      anim_reload(ps, sprite);
+      break;
+
+    default: {
+      // Simple states: map directly to animation
+      const char* anim = state_to_animation(ps->current);
+      if (!cf_sprite_is_playing(sprite, anim)) {
+        cf_sprite_play(sprite, anim);
       }
+      break;
+    }
     }
 
-    // Crouch fire animation - no movement variant needed
-    if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
-        anim_name = nullptr;
-      } else {
-        anim_name = "GunCrouchFire";
-      }
-    }
+    // Update sprite animation
+    cf_sprite_update(sprite);
 
-    // Only call cf_sprite_play when animation changes
-    if (anim_name && !cf_sprite_is_playing(sprite_comp, anim_name)) {
-      cf_sprite_play(sprite_comp, anim_name);
-    }
-
-    // Update sprite animation every frame
-    cf_sprite_update(sprite_comp);
-
-    // Check if reloading or firing animation should finish
-    // Only check after at least one frame (state_timer > 0)
-    if (ps->state_timer > 0.0f && (ps->current == PLAYER_STATE_RELOADING ||
-                                   ps->current == PLAYER_STATE_FIRING ||
-                                   ps->current == PLAYER_STATE_CROUCH_FIRING)) {
-      bool should_finish = false;
-
-      // GunWalkFire has 8 frames but we only want 4 (one shot)
-      if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
-      } else {
-        should_finish = cf_sprite_will_finish(sprite_comp);
-      }
-
-      if (should_finish) {
-        // Return to crouching if was crouch firing, otherwise idle
-        if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-          ps->current = PLAYER_STATE_CROUCHING;
-        } else {
-          ps->current = PLAYER_STATE_IDLE;
-        }
-      }
-    }
-
-    // Set horizontal flip based on facing direction
-    if (controller->facing_direction.x >= 0.0f) {
-      sprite_comp->scale.x = 1.0f;
-    } else {
-      sprite_comp->scale.x = -1.0f;
-    }
+    // Flip sprite based on facing direction
+    sprite->scale.x = (controller->facing_direction.x >= 0.0f) ? 1.0f : -1.0f;
   }
 
   return 0;
 }
-// NOLINTEND
 
 // =============================================================================
 // System: Render Sprites
@@ -319,6 +341,8 @@ void make_player(void) {
   ps->current     = PLAYER_STATE_IDLE;
   ps->previous    = PLAYER_STATE_IDLE;
   ps->state_timer = 0.0f;
+  ps->coro        = 0;
+  ps->anim_name   = nullptr;
 
   // Initialize transform at center of screen (CF origin is at center)
   auto transform      = ECS_ADD(player, C_Transform);
