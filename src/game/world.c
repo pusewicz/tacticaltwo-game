@@ -17,30 +17,6 @@
 #include "../engine/game_state.h"
 
 // =============================================================================
-// Animation Mapping
-// =============================================================================
-
-static const char* state_to_animation(PlayerState ps) {
-  switch (ps) {
-  case PLAYER_STATE_IDLE:
-    return "GunAim";
-  case PLAYER_STATE_WALKING:
-    return "GunWalk";
-  case PLAYER_STATE_CROUCHING:
-  case PLAYER_STATE_CROUCH_WALKING:
-    return "GunCrouch";
-  case PLAYER_STATE_FIRING:
-    return "GunFire";
-  case PLAYER_STATE_CROUCH_FIRING:
-    return "GunCrouchFire";
-  case PLAYER_STATE_RELOADING:
-    return "GunReload";
-  default:
-    return "GunAim";
-  }
-}
-
-// =============================================================================
 // System: Gather Input
 // =============================================================================
 // Reads keyboard state and populates the input component.
@@ -195,7 +171,9 @@ static ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
 // =============================================================================
 // System: Update Animation
 // =============================================================================
-// Maps player state to animation and updates sprite.
+// Maps player state to animation and updates sprite using switch-based state
+// machine pattern. Each state case handles its own animation logic and
+// transitions.
 
 // NOLINTBEGIN
 static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
@@ -207,63 +185,91 @@ static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
     auto controller  = ECS_GET(entities[i], C_PlayerController);
     auto velocity    = ECS_GET(entities[i], C_Velocity);
 
-    // Get animation name for current state
-    const char* anim_name = state_to_animation(ps->current);
-
-    // Use walk+fire animation if firing while moving
-    // Only pick fire animation at start of firing (don't switch mid-animation)
-    if (ps->current == PLAYER_STATE_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunFire") ||
-          cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        // Already in firing animation - don't change it
-        anim_name = nullptr;
-      } else {
-        // Just started firing - pick animation based on current velocity
-        bool moving = velocity->x != 0.0f;
-        anim_name   = moving ? "GunWalkFire" : "GunFire";
+    // Switch-based state machine for animation handling
+    // Each state manages its own animation selection and transitions
+    switch (ps->current) {
+    case PLAYER_STATE_IDLE:
+      // Idle state: play aim animation
+      if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
+        cf_sprite_play(sprite_comp, "GunAim");
       }
-    }
+      break;
 
-    // Crouch fire animation - no movement variant needed
-    if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
-        anim_name = nullptr;
-      } else {
-        anim_name = "GunCrouchFire";
+    case PLAYER_STATE_WALKING:
+      // Walking state: play walk animation
+      if (!cf_sprite_is_playing(sprite_comp, "GunWalk")) {
+        cf_sprite_play(sprite_comp, "GunWalk");
       }
-    }
+      break;
 
-    // Only call cf_sprite_play when animation changes
-    if (anim_name && !cf_sprite_is_playing(sprite_comp, anim_name)) {
-      cf_sprite_play(sprite_comp, anim_name);
+    case PLAYER_STATE_CROUCHING:
+    case PLAYER_STATE_CROUCH_WALKING:
+      // Crouch states: play crouch animation
+      if (!cf_sprite_is_playing(sprite_comp, "GunCrouch")) {
+        cf_sprite_play(sprite_comp, "GunCrouch");
+      }
+      break;
+
+    case PLAYER_STATE_FIRING:
+      // Firing state: select appropriate fire animation on entry
+      if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
+          !cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+        // Just entered firing state - pick animation based on velocity
+        bool moving       = velocity->x != 0.0f;
+        const char* anim  = moving ? "GunWalkFire" : "GunFire";
+        cf_sprite_play(sprite_comp, anim);
+      }
+
+      // Check for animation completion to exit state
+      if (ps->state_timer > 0.0f) {
+        bool should_finish = false;
+        if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+          // GunWalkFire has 8 frames but we only want 4 (one shot)
+          should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
+        } else {
+          should_finish = cf_sprite_will_finish(sprite_comp);
+        }
+
+        if (should_finish) {
+          ps->current = PLAYER_STATE_IDLE;
+        }
+      }
+      break;
+
+    case PLAYER_STATE_CROUCH_FIRING:
+      // Crouch firing state: play crouch fire animation
+      if (!cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
+        cf_sprite_play(sprite_comp, "GunCrouchFire");
+      }
+
+      // Check for animation completion to exit state
+      if (ps->state_timer > 0.0f && cf_sprite_will_finish(sprite_comp)) {
+        ps->current = PLAYER_STATE_CROUCHING;
+      }
+      break;
+
+    case PLAYER_STATE_RELOADING:
+      // Reloading state: play reload animation
+      if (!cf_sprite_is_playing(sprite_comp, "GunReload")) {
+        cf_sprite_play(sprite_comp, "GunReload");
+      }
+
+      // Check for animation completion to exit state
+      if (ps->state_timer > 0.0f && cf_sprite_will_finish(sprite_comp)) {
+        ps->current = PLAYER_STATE_IDLE;
+      }
+      break;
+
+    default:
+      // Fallback to idle animation for unknown states
+      if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
+        cf_sprite_play(sprite_comp, "GunAim");
+      }
+      break;
     }
 
     // Update sprite animation every frame
     cf_sprite_update(sprite_comp);
-
-    // Check if reloading or firing animation should finish
-    // Only check after at least one frame (state_timer > 0)
-    if (ps->state_timer > 0.0f && (ps->current == PLAYER_STATE_RELOADING ||
-                                   ps->current == PLAYER_STATE_FIRING ||
-                                   ps->current == PLAYER_STATE_CROUCH_FIRING)) {
-      bool should_finish = false;
-
-      // GunWalkFire has 8 frames but we only want 4 (one shot)
-      if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
-      } else {
-        should_finish = cf_sprite_will_finish(sprite_comp);
-      }
-
-      if (should_finish) {
-        // Return to crouching if was crouch firing, otherwise idle
-        if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-          ps->current = PLAYER_STATE_CROUCHING;
-        } else {
-          ps->current = PLAYER_STATE_IDLE;
-        }
-      }
-    }
 
     // Set horizontal flip based on facing direction
     if (controller->facing_direction.x >= 0.0f) {
