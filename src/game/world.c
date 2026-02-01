@@ -11,9 +11,9 @@
 // Animation Constants
 // =============================================================================
 
-// GunWalkFire animation has 8 frames but we only play 4 frames for a single shot
-// Frames are 0-indexed, so we want frames 0, 1, 2, 3 (4 frames total)
-#define GUNWALKFIRE_SINGLE_SHOT_FRAME_COUNT 4
+// GunWalkFire animation has 8 frames but we only play the first few for a single shot
+// Stop when current frame reaches this value (0-indexed frames: 0, 1, 2 are played)
+#define GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME 3
 
 #include <cute_draw.h>
 #include <cute_hashtable.h>
@@ -232,9 +232,9 @@ static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
       if (ps->state_timer > 0.0f) {
         bool should_finish = false;
         if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-          // GunWalkFire: stop after playing FRAME_COUNT frames (0-indexed)
+          // Stop GunWalkFire early to play only a single shot
           should_finish = cf_sprite_current_frame(sprite_comp) >= 
-                          GUNWALKFIRE_SINGLE_SHOT_FRAME_COUNT;
+                          GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME;
         } else {
           should_finish = cf_sprite_will_finish(sprite_comp);
         }
