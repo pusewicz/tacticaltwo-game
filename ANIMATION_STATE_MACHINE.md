@@ -19,9 +19,9 @@ The implementation uses **Duff's Device** - a clever C technique that combines s
 
 #define COROUTINE_YIELD(state_var) \
   do {                             \
-    state_var = __LINE__;          \
+    state_var = __COUNTER__;       \
     return 0;                      \
-  case __LINE__:;                  \
+  case __COUNTER__:;               \
   } while (0)
 
 #define COROUTINE_END \
@@ -31,8 +31,9 @@ The implementation uses **Duff's Device** - a clever C technique that combines s
 
 These macros work together:
 - `COROUTINE_BEGIN`: Initializes the switch statement that dispatches to the saved execution point
-- `COROUTINE_YIELD`: Saves the current line number and returns, resuming at that line on next call
-  - **Note**: Relies on `__LINE__` being unique. Don't put multiple yields on one line!
+- `COROUTINE_YIELD`: Saves a unique counter value and returns, resuming at that point on next call
+  - Uses `__COUNTER__` for guaranteed uniqueness on each macro expansion
+  - Widely supported across compilers (GCC, Clang, MSVC)
 - `COROUTINE_END`: Closes the coroutine
 
 ## Benefits of This Approach

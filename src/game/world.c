@@ -22,8 +22,8 @@
 // Each state can yield execution and resume at the same point next frame.
 // This provides zero-overhead state persistence and trivial serialization.
 //
-// IMPORTANT: Don't place multiple COROUTINE_YIELD calls on the same source line!
-// The macro relies on __LINE__ being unique at each yield point.
+// Uses __COUNTER__ for unique case labels - widely supported across compilers
+// (GCC, Clang, MSVC) and guarantees uniqueness on each macro expansion.
 
 #define COROUTINE_BEGIN(state_var) \
   switch (state_var) {             \
@@ -31,9 +31,9 @@
 
 #define COROUTINE_YIELD(state_var) \
   do {                             \
-    state_var = __LINE__;          \
+    state_var = __COUNTER__;       \
     return 0;                      \
-  case __LINE__:;                  \
+  case __COUNTER__:;               \
   } while (0)
 
 #define COROUTINE_END \
