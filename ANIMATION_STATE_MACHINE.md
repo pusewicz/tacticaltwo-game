@@ -15,7 +15,7 @@ The implementation uses **Duff's Device** - a clever C technique that combines s
 ```c
 #define COROUTINE_BEGIN(state_var) \
   switch (state_var) {             \
-  case 0:
+  case 0:;
 
 #define COROUTINE_YIELD(state_var) \
   do {                             \
@@ -32,6 +32,7 @@ The implementation uses **Duff's Device** - a clever C technique that combines s
 These macros work together:
 - `COROUTINE_BEGIN`: Initializes the switch statement that dispatches to the saved execution point
 - `COROUTINE_YIELD`: Saves the current line number and returns, resuming at that line on next call
+  - **Note**: Relies on `__LINE__` being unique. Don't put multiple yields on one line!
 - `COROUTINE_END`: Closes the coroutine
 
 ## Benefits of This Approach

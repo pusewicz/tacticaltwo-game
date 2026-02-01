@@ -21,6 +21,9 @@
 // These macros enable resumable execution within animation state handlers.
 // Each state can yield execution and resume at the same point next frame.
 // This provides zero-overhead state persistence and trivial serialization.
+//
+// IMPORTANT: Don't place multiple COROUTINE_YIELD calls on the same source line!
+// The macro relies on __LINE__ being unique at each yield point.
 
 #define COROUTINE_BEGIN(state_var) \
   switch (state_var) {             \
