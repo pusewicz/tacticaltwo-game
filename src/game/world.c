@@ -7,6 +7,13 @@
 
 #include "world.h"
 
+// =============================================================================
+// Animation Constants
+// =============================================================================
+
+// GunWalkFire animation has 8 frames but we only play 4 frames for a single shot
+#define GUNWALKFIRE_SINGLE_SHOT_LAST_FRAME 3
+
 #include <cute_draw.h>
 #include <cute_hashtable.h>
 #include <cute_input.h>
@@ -225,7 +232,8 @@ static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
         bool should_finish = false;
         if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
           // GunWalkFire has 8 frames but we only want 4 (one shot)
-          should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
+          should_finish = cf_sprite_current_frame(sprite_comp) >= 
+                          GUNWALKFIRE_SINGLE_SHOT_LAST_FRAME;
         } else {
           should_finish = cf_sprite_will_finish(sprite_comp);
         }
