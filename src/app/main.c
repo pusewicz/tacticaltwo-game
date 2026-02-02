@@ -19,8 +19,6 @@
 
 // Counter for number of times the game has been reloaded
 static int reloaded_counter = 0;
-// Number of seconds to display the "reloaded" message
-static float reloaded_timeout = 5.0f;
 
 static void on_update(void* udata) {
 #ifdef ENGINE_HOT_RELOADING
@@ -39,7 +37,6 @@ static void on_update(void* udata) {
 
       log_info("main", "Game reloaded successfully! (total reloads: %d)",
                reloaded_counter);
-      reloaded_timeout = 5;
 
       *game_library = new_game_library;
       game_library->hot_reload(game_state);
@@ -82,20 +79,6 @@ int main(int argc, char* argv[]) {
     game_render();
 #endif
 
-    if (reloaded_timeout > 0) {
-      cf_draw_push();
-      {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Game reloaded! (%d)", reloaded_counter);
-        cf_draw_push();
-        cf_draw_push_color(cf_color_green());
-        cf_draw_text(buf, cf_v2(10.0f, 10.0f), -1);
-        cf_draw_pop();
-
-        reloaded_timeout -= CF_DELTA_TIME;
-      }
-      cf_draw_pop();
-    }
     platform_end_frame();
   }
 
