@@ -7,6 +7,39 @@
 
 #include "world.h"
 
+// =============================================================================
+// Animation Constants
+// =============================================================================
+
+// GunWalkFire animation has 8 frames but we only play the first few for a single shot
+// Stop when current frame reaches this value (0-indexed frames: 0, 1, 2 are played)
+#define GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME 3
+
+// =============================================================================
+// Coroutine Macros - Stackless coroutine using Duff's Device
+// =============================================================================
+// These macros enable resumable execution within animation state handlers.
+// Each state can yield execution and resume at the same point next frame.
+// This provides zero-overhead state persistence and trivial serialization.
+//
+// Uses __COUNTER__ for unique case labels - widely supported across compilers
+// (GCC, Clang, MSVC) and guarantees uniqueness on each macro expansion.
+
+#define COROUTINE_BEGIN(state_var) \
+  switch (state_var) {             \
+  case 0:;
+
+#define COROUTINE_YIELD(state_var) \
+  do {                             \
+    state_var = __COUNTER__;       \
+    return 0;                      \
+  case __COUNTER__:;               \
+  } while (0)
+
+#define COROUTINE_END \
+  }                   \
+  return 0
+
 #include <cute_draw.h>
 #include <cute_hashtable.h>
 #include <cute_input.h>
@@ -15,30 +48,6 @@
 #include <stddef.h>
 
 #include "../engine/game_state.h"
-
-// =============================================================================
-// Animation Mapping
-// =============================================================================
-
-static const char* state_to_animation(PlayerState ps) {
-  switch (ps) {
-  case PLAYER_STATE_IDLE:
-    return "GunAim";
-  case PLAYER_STATE_WALKING:
-    return "GunWalk";
-  case PLAYER_STATE_CROUCHING:
-  case PLAYER_STATE_CROUCH_WALKING:
-    return "GunCrouch";
-  case PLAYER_STATE_FIRING:
-    return "GunFire";
-  case PLAYER_STATE_CROUCH_FIRING:
-    return "GunCrouchFire";
-  case PLAYER_STATE_RELOADING:
-    return "GunReload";
-  default:
-    return "GunAim";
-  }
-}
 
 // =============================================================================
 // System: Gather Input
@@ -114,9 +123,10 @@ static ecs_ret_t sys_update_player_state([[maybe_unused]] ecs_t* ecs,
       ps->current = PLAYER_STATE_IDLE;
     }
 
-    // Update state timer
+    // Update state timer and reset coroutine on state change
     if (ps->current != ps->previous) {
       ps->state_timer = 0.0f;
+      ps->coroutine_state = 0; // Reset coroutine for new state
     } else {
       ps->state_timer += dt;
     }
@@ -193,9 +203,164 @@ static ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
 }
 
 // =============================================================================
+// Animation State Handlers - Stackless Coroutines
+// =============================================================================
+// Each handler is a resumable coroutine that manages one animation state.
+// They can yield execution while waiting for animations to complete.
+
+// Handler for IDLE state
+static int anim_state_idle(C_Sprite* sprite_comp, C_PlayerState* ps,
+                          C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Play idle animation
+  if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
+    cf_sprite_play(sprite_comp, "GunAim");
+  }
+  
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
+  while (true) {
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  COROUTINE_END;
+}
+
+// Handler for WALKING state
+static int anim_state_walking(C_Sprite* sprite_comp, C_PlayerState* ps,
+                             C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Play walk animation
+  if (!cf_sprite_is_playing(sprite_comp, "GunWalk")) {
+    cf_sprite_play(sprite_comp, "GunWalk");
+  }
+  
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
+  while (true) {
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  COROUTINE_END;
+}
+
+// Handler for CROUCHING state
+static int anim_state_crouching(C_Sprite* sprite_comp, C_PlayerState* ps,
+                               C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Play crouch animation
+  if (!cf_sprite_is_playing(sprite_comp, "GunCrouch")) {
+    cf_sprite_play(sprite_comp, "GunCrouch");
+  }
+  
+  // Infinite loop - yield every frame until state changes externally
+  // State transition handled by sys_update_player_state
+  while (true) {
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  COROUTINE_END;
+}
+
+// Handler for FIRING state
+static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
+                            C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Entry: Select appropriate fire animation based on velocity
+  if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
+      !cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+    bool moving = velocity->x != 0.0f;
+    const char* anim = moving ? "GunWalkFire" : "GunFire";
+    cf_sprite_play(sprite_comp, anim);
+  }
+  
+  // Wait one frame to let state_timer increment
+  COROUTINE_YIELD(ps->coroutine_state);
+  
+  // Wait for animation to complete
+  while (ps->state_timer > 0.0f) {
+    bool should_finish = false;
+    if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+      // Stop GunWalkFire early to play only a single shot
+      should_finish = cf_sprite_current_frame(sprite_comp) >= 
+                      GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME;
+    } else {
+      should_finish = cf_sprite_will_finish(sprite_comp);
+    }
+    
+    if (should_finish) {
+      // Transition to IDLE (coroutine_state reset by sys_update_player_state)
+      ps->current = PLAYER_STATE_IDLE;
+      COROUTINE_END;
+    }
+    
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  COROUTINE_END;
+}
+
+// Handler for CROUCH_FIRING state
+static int anim_state_crouch_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
+                                   C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Play crouch fire animation
+  if (!cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
+    cf_sprite_play(sprite_comp, "GunCrouchFire");
+  }
+  
+  // Wait one frame to let state_timer increment
+  COROUTINE_YIELD(ps->coroutine_state);
+  
+  // Wait for animation to complete
+  while (ps->state_timer > 0.0f && !cf_sprite_will_finish(sprite_comp)) {
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  // Transition to CROUCHING (coroutine_state reset by sys_update_player_state)
+  ps->current = PLAYER_STATE_CROUCHING;
+  
+  COROUTINE_END;
+}
+
+// Handler for RELOADING state
+static int anim_state_reloading(C_Sprite* sprite_comp, C_PlayerState* ps,
+                               C_PlayerController* controller, C_Velocity* velocity) {
+  COROUTINE_BEGIN(ps->coroutine_state);
+  
+  // Play reload animation
+  if (!cf_sprite_is_playing(sprite_comp, "GunReload")) {
+    cf_sprite_play(sprite_comp, "GunReload");
+  }
+  
+  // Wait one frame to let state_timer increment
+  COROUTINE_YIELD(ps->coroutine_state);
+  
+  // Wait for animation to complete
+  while (ps->state_timer > 0.0f && !cf_sprite_will_finish(sprite_comp)) {
+    COROUTINE_YIELD(ps->coroutine_state);
+  }
+  
+  // Transition to IDLE (coroutine_state reset by sys_update_player_state)
+  ps->current = PLAYER_STATE_IDLE;
+  
+  COROUTINE_END;
+}
+
+// =============================================================================
 // System: Update Animation
 // =============================================================================
-// Maps player state to animation and updates sprite.
+// Stackless coroutine-based animation system using Duff's Device.
+// Each state is handled by a resumable coroutine that can yield execution
+// while waiting for animations to complete. This provides:
+//   - Trivial serialization (save/load game state)
+//   - Zero memory overhead (execution state in coroutine_state)
+//   - Manual variable persistence (all state in component structs)
 
 // NOLINTBEGIN
 static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
@@ -207,63 +372,43 @@ static ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
     auto controller  = ECS_GET(entities[i], C_PlayerController);
     auto velocity    = ECS_GET(entities[i], C_Velocity);
 
-    // Get animation name for current state
-    const char* anim_name = state_to_animation(ps->current);
+    // Dispatch to appropriate coroutine based on current state
+    switch (ps->current) {
+    case PLAYER_STATE_IDLE:
+      anim_state_idle(sprite_comp, ps, controller, velocity);
+      break;
 
-    // Use walk+fire animation if firing while moving
-    // Only pick fire animation at start of firing (don't switch mid-animation)
-    if (ps->current == PLAYER_STATE_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunFire") ||
-          cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        // Already in firing animation - don't change it
-        anim_name = nullptr;
-      } else {
-        // Just started firing - pick animation based on current velocity
-        bool moving = velocity->x != 0.0f;
-        anim_name   = moving ? "GunWalkFire" : "GunFire";
+    case PLAYER_STATE_WALKING:
+      anim_state_walking(sprite_comp, ps, controller, velocity);
+      break;
+
+    case PLAYER_STATE_CROUCHING:
+    case PLAYER_STATE_CROUCH_WALKING:
+      anim_state_crouching(sprite_comp, ps, controller, velocity);
+      break;
+
+    case PLAYER_STATE_FIRING:
+      anim_state_firing(sprite_comp, ps, controller, velocity);
+      break;
+
+    case PLAYER_STATE_CROUCH_FIRING:
+      anim_state_crouch_firing(sprite_comp, ps, controller, velocity);
+      break;
+
+    case PLAYER_STATE_RELOADING:
+      anim_state_reloading(sprite_comp, ps, controller, velocity);
+      break;
+
+    default:
+      // Fallback to idle animation for unknown states
+      if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
+        cf_sprite_play(sprite_comp, "GunAim");
       }
-    }
-
-    // Crouch fire animation - no movement variant needed
-    if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
-        anim_name = nullptr;
-      } else {
-        anim_name = "GunCrouchFire";
-      }
-    }
-
-    // Only call cf_sprite_play when animation changes
-    if (anim_name && !cf_sprite_is_playing(sprite_comp, anim_name)) {
-      cf_sprite_play(sprite_comp, anim_name);
+      break;
     }
 
     // Update sprite animation every frame
     cf_sprite_update(sprite_comp);
-
-    // Check if reloading or firing animation should finish
-    // Only check after at least one frame (state_timer > 0)
-    if (ps->state_timer > 0.0f && (ps->current == PLAYER_STATE_RELOADING ||
-                                   ps->current == PLAYER_STATE_FIRING ||
-                                   ps->current == PLAYER_STATE_CROUCH_FIRING)) {
-      bool should_finish = false;
-
-      // GunWalkFire has 8 frames but we only want 4 (one shot)
-      if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
-      } else {
-        should_finish = cf_sprite_will_finish(sprite_comp);
-      }
-
-      if (should_finish) {
-        // Return to crouching if was crouch firing, otherwise idle
-        if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-          ps->current = PLAYER_STATE_CROUCHING;
-        } else {
-          ps->current = PLAYER_STATE_IDLE;
-        }
-      }
-    }
 
     // Set horizontal flip based on facing direction
     if (controller->facing_direction.x >= 0.0f) {
@@ -315,10 +460,11 @@ void make_player(void) {
   controller->facing_direction = cf_v2(1.0f, 0.0f); // Default: facing right
 
   // Initialize player state
-  auto ps         = ECS_ADD(player, C_PlayerState);
-  ps->current     = PLAYER_STATE_IDLE;
-  ps->previous    = PLAYER_STATE_IDLE;
-  ps->state_timer = 0.0f;
+  auto ps              = ECS_ADD(player, C_PlayerState);
+  ps->current          = PLAYER_STATE_IDLE;
+  ps->previous         = PLAYER_STATE_IDLE;
+  ps->state_timer      = 0.0f;
+  ps->coroutine_state   = 0; // Start coroutine from beginning
 
   // Initialize transform at center of screen (CF origin is at center)
   auto transform      = ECS_ADD(player, C_Transform);
