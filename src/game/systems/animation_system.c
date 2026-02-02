@@ -2,8 +2,12 @@
 //
 // Maps player state to animation and updates sprite.
 
+#include <cute_sprite.h>
+#include <stddef.h>
+
 #include "../../engine/game_state.h"
 #include "systems.h"
+#include "world.h"
 
 // =============================================================================
 // Animation Mapping
@@ -39,10 +43,10 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
                                ecs_entity_t* entities, size_t count,
                                [[maybe_unused]] void* udata) {
   for (size_t i = 0; i < count; i++) {
-    auto sprite_comp = ECS_GET(entities[i], C_Sprite);
-    auto ps          = ECS_GET(entities[i], C_PlayerState);
-    auto controller  = ECS_GET(entities[i], C_PlayerController);
-    auto velocity    = ECS_GET(entities[i], C_Velocity);
+    auto sprite     = ECS_GET(entities[i], C_Sprite);
+    auto ps         = ECS_GET(entities[i], C_PlayerState);
+    auto controller = ECS_GET(entities[i], C_PlayerController);
+    auto velocity   = ECS_GET(entities[i], C_Velocity);
 
     // Get animation name for current state
     const char* anim_name = state_to_animation(ps->current);
@@ -50,8 +54,8 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
     // Use walk+fire animation if firing while moving
     // Only pick fire animation at start of firing (don't switch mid-animation)
     if (ps->current == PLAYER_STATE_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunFire") ||
-          cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
+      if (cf_sprite_is_playing(sprite, "GunFire") ||
+          cf_sprite_is_playing(sprite, "GunWalkFire")) {
         // Already in firing animation - don't change it
         anim_name = nullptr;
       } else {
@@ -63,7 +67,7 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
 
     // Crouch fire animation - no movement variant needed
     if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-      if (cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
+      if (cf_sprite_is_playing(sprite, "GunCrouchFire")) {
         anim_name = nullptr;
       } else {
         anim_name = "GunCrouchFire";
@@ -71,12 +75,12 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
     }
 
     // Only call cf_sprite_play when animation changes
-    if (anim_name && !cf_sprite_is_playing(sprite_comp, anim_name)) {
-      cf_sprite_play(sprite_comp, anim_name);
+    if (anim_name && !cf_sprite_is_playing(sprite, anim_name)) {
+      cf_sprite_play(sprite, anim_name);
     }
 
     // Update sprite animation every frame
-    cf_sprite_update(sprite_comp);
+    cf_sprite_update(sprite);
 
     // Check if reloading or firing animation should finish
     // Only check after at least one frame (state_timer > 0)
@@ -86,10 +90,10 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
       bool should_finish = false;
 
       // GunWalkFire has 8 frames but we only want 4 (one shot)
-      if (cf_sprite_is_playing(sprite_comp, "GunWalkFire")) {
-        should_finish = cf_sprite_current_frame(sprite_comp) >= 3;
+      if (cf_sprite_is_playing(sprite, "GunWalkFire")) {
+        should_finish = cf_sprite_current_frame(sprite) >= 3;
       } else {
-        should_finish = cf_sprite_will_finish(sprite_comp);
+        should_finish = cf_sprite_will_finish(sprite);
       }
 
       if (should_finish) {
@@ -104,9 +108,9 @@ ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
 
     // Set horizontal flip based on facing direction
     if (controller->facing_direction.x >= 0.0f) {
-      sprite_comp->scale.x = 1.0f;
+      sprite->scale.x = 1.0f;
     } else {
-      sprite_comp->scale.x = -1.0f;
+      sprite->scale.x = -1.0f;
     }
   }
 

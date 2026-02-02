@@ -2,8 +2,12 @@
 //
 // Integrates velocity into position using simple Euler integration.
 
+#include <cute_math.h>
+#include <stddef.h>
+
 #include "../../engine/game_state.h"
 #include "systems.h"
+#include "world.h"
 
 ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
                              ecs_entity_t* entities, size_t count,

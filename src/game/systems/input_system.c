@@ -4,9 +4,11 @@
 // Movement uses held state, actions use single-frame triggers.
 
 #include <cute_input.h>
+#include <stddef.h>
 
 #include "../../engine/game_state.h"
 #include "systems.h"
+#include "world.h"
 
 ecs_ret_t sys_gather_input([[maybe_unused]] ecs_t* ecs, ecs_entity_t* entities,
                            size_t count, [[maybe_unused]] void* udata) {

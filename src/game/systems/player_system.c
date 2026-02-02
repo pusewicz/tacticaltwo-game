@@ -3,8 +3,12 @@
 // sys_update_player_state: State machine (idle, walking, crouching, firing,
 // etc.) sys_update_player_movement: Sets velocity based on state and input
 
+#include <cute_math.h>
+#include <stddef.h>
+
 #include "../../engine/game_state.h"
 #include "systems.h"
+#include "world.h"
 
 // =============================================================================
 // System: Update Player State

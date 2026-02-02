@@ -13,18 +13,6 @@
 #include <stdbool.h>
 
 // =============================================================================
-// World - ECS context with component/system registries
-// =============================================================================
-
-typedef struct World {
-  ecs_t* ecs;
-  htbl ecs_comp_t* components;
-  htbl ecs_system_t* systems;
-  float dt;
-  ecs_entity_t player;
-} World;
-
-// =============================================================================
 // ECS Macros
 // =============================================================================
 
@@ -77,6 +65,18 @@ typedef struct World {
 
 #define ECS_RUN_SYSTEM(SYSTEM)                                                 \
   ecs_run_system(state->world.ecs, ECS_GET_SYSTEM(SYSTEM), 0)
+
+// =============================================================================
+// World - ECS context with component/system registries
+// =============================================================================
+
+typedef struct World {
+  ecs_t* ecs;
+  htbl ecs_comp_t* components;
+  htbl ecs_system_t* systems;
+  float dt;
+  ecs_entity_t player;
+} World;
 
 // =============================================================================
 // Player State Enum

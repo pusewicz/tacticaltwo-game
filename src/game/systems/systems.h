@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stddef.h>
+
 #include "../world.h"
 
 // Input system - reads keyboard/mouse state into C_PlayerInput
