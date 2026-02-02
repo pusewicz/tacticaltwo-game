@@ -74,21 +74,38 @@ bool game_update(void) {
 }
 
 void game_render(void) {
-  render_world();
+  cf_draw_push_filter(CF_DRAW_FILTER_NEAREST);
 
-  // Draw game content to the canvas.
-  cf_render_to(state->canvas, true);
-  int window_w = cf_app_get_width();
-  int window_h = cf_app_get_height();
+  // Render to the game canvas
+  {
+    // Cornflower blue (6495ED) background
+    cf_clear_color(100.0f / 255.0f, 149.0f / 255.0f, 237.0f / 255.0f, 1.0f);
+    cf_clear_canvas(state->canvas);
 
-  cf_app_set_canvas_size(window_w, window_h);
-  CF_V2 dest =
-      calculate_dest_size(CANVAS_WIDTH, CANVAS_HEIGHT, window_w, window_h);
-  cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
-  cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+    render_world();
 
-  // Restore pojection for the next frame
-  cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+    // Draw game content to the canvas.
+    cf_render_to(state->canvas, true);
+  }
+
+  // Render canvas to the window with aspect ratio correction
+  {
+    int window_w = cf_app_get_width();
+    int window_h = cf_app_get_height();
+
+    cf_clear_color(0, 0, 0, 1.0f); // Black bars
+
+    cf_app_set_canvas_size(window_w, window_h);
+    CF_V2 dest =
+        calculate_dest_size(CANVAS_WIDTH, CANVAS_HEIGHT, window_w, window_h);
+    cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
+    cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+
+    // Restore pojection for the next frame
+    cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+  }
+
+  cf_draw_pop_filter();
 }
 
 EXPORT void game_shutdown(void) {

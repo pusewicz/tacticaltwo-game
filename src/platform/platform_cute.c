@@ -6,6 +6,7 @@
 #include <cute_app.h>
 #include <cute_defines.h>
 #include <cute_file_system.h>
+#include <cute_graphics.h>
 #include <cute_result.h>
 #include <cute_symbol.h>
 #include <cute_time.h>
@@ -33,7 +34,7 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
 
   log_info("platform", "Initializing platform...");
 
-  int options = 0;
+  int options = CF_APP_OPTIONS_RESIZABLE_BIT;
   CF_Result result =
       cf_make_app("TacticalTwo", 0, 0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                   CANVAS_HEIGHT * CANVAS_SCALE, options, argv[0]);
@@ -41,9 +42,6 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
   cf_set_fixed_timestep(60);
   cf_set_target_framerate(60);
   cf_app_set_vsync(false);
-
-  // Cornflower blue (6495ED) background
-  cf_clear_color(100.0f / 255.0f, 149.0f / 255.0f, 237.0f / 255.0f, 1.0f);
 
   if (cf_is_error(result)) {
     log_fatal("platform", "Failed to create app: %s", result.details);
