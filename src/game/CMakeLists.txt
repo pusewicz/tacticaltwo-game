@@ -3,6 +3,11 @@ set(NAME "game")
 add_library(${NAME} SHARED
   game.c
   world.c
+  systems/input_system.c
+  systems/player_system.c
+  systems/physics_system.c
+  systems/animation_system.c
+  systems/render_system.c
   ../engine/asset.c
   ../engine/log.c
 )
