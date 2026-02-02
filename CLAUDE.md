@@ -2,6 +2,11 @@
 
 C23 game using Cute Framework with hot-reloading support.
 
+## Setup
+```bash
+git submodule update --init --recursive
+```
+
 ## Build Commands
 - `rake` - Build RelWithDebInfo (default)
 - `rake run` - Build and run game

@@ -1,16 +1,6 @@
-include(FetchContent)
-
 ###
 # Dependencies
 ###
-
-FetchContent_Declare(
-  cute
-  GIT_REPOSITORY https://github.com/RandyGaul/cute_framework.git
-  GIT_TAG master
-  GIT_SHALLOW TRUE
-  FETCHCONTENT_FULLY_DISCONNECTED
-)
 
 ###
 # Settings
@@ -27,10 +17,10 @@ else()
 endif()
 
 ###
-# Populate
+# Add cute_framework
 ###
 
-FetchContent_MakeAvailable(cute)
+add_subdirectory(cute_framework)
 
 # Mark cute headers as system to suppress warnings
 get_target_property(CUTE_INCLUDE_DIRS cute INTERFACE_INCLUDE_DIRECTORIES)

@@ -1,0 +1,3 @@
+[submodule "vendor/cute_framework"]
+	path = vendor/cute_framework
+	url = https://github.com/pusewicz/cute_framework.git
