@@ -6,6 +6,7 @@
 #define PICO_ECS_IMPLEMENTATION
 
 #include "world.h"
+#include "coro.h"
 
 // =============================================================================
 // Animation Constants
@@ -14,57 +15,6 @@
 // GunWalkFire animation has 8 frames but we only play the first few for a single shot
 // Stop when current frame reaches this value (0-indexed frames: 0, 1, 2 are played)
 #define GUNWALKFIRE_SINGLE_SHOT_STOP_FRAME 3
-
-// =============================================================================
-// Coroutine Macros - Stackless coroutine using Duff's Device
-// =============================================================================
-// A lightweight coroutine implementation using Duff's Device.
-// Coroutines can yield execution and resume where they left off,
-// making sequential animation logic easy to write.
-//
-// Based on Simon Tatham's coroutines and Scott Lembcke's state machines.
-// https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
-// https://www.slembcke.net/blog/StateMachines/
-//
-// Uses __COUNTER__ for unique case labels - widely supported across compilers
-// (GCC, Clang, MSVC) and guarantees uniqueness on each macro expansion.
-
-// Begin a coroutine block
-#define coro_begin(state_var) \
-  switch (state_var) {        \
-  case 0:;
-
-// Yield execution - next call resumes at this point
-#define coro_yield(state_var) \
-  do {                        \
-    state_var = __COUNTER__;  \
-    return 0;                 \
-  case __COUNTER__:;          \
-  } while (0)
-
-// Yield until condition becomes true
-#define coro_wait(state_var, condition) \
-  do {                                  \
-    state_var = __COUNTER__;            \
-  case __COUNTER__:                     \
-    if (!(condition))                   \
-      return 0;                         \
-  } while (0)
-
-// End the coroutine block - sets state to -1 (done)
-#define coro_end(state_var) \
-  state_var = -1;           \
-  }                         \
-  return 0
-
-// Reset coroutine to initial state
-#define coro_reset(state_var) ((state_var) = 0)
-
-// Check if coroutine has finished (reached coro_end)
-#define coro_done(state_var) ((state_var) == -1)
-
-// Check if coroutine is at the start (never run or just reset)
-#define coro_idle(state_var) ((state_var) == 0)
 
 #include <cute_draw.h>
 #include <cute_hashtable.h>
