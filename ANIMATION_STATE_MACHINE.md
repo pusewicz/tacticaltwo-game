@@ -13,28 +13,63 @@ The implementation uses **Duff's Device** - a clever C technique that combines s
 ## Coroutine Macros
 
 ```c
-#define COROUTINE_BEGIN(state_var) \
-  switch (state_var) {             \
+// Begin a coroutine block
+#define coro_begin(state_var) \
+  switch (state_var) {        \
   case 0:;
 
-#define COROUTINE_YIELD(state_var) \
-  do {                             \
-    state_var = __COUNTER__;       \
-    return 0;                      \
-  case __COUNTER__:;               \
+// Yield execution - next call resumes at this point
+#define coro_yield(state_var) \
+  do {                        \
+    state_var = __COUNTER__;  \
+    return 0;                 \
+  case __COUNTER__:;          \
   } while (0)
 
-#define COROUTINE_END \
-  }                   \
+// Yield until condition becomes true
+#define coro_wait(state_var, condition) \
+  do {                                  \
+    state_var = __COUNTER__;            \
+  case __COUNTER__:                     \
+    if (!(condition))                   \
+      return 0;                         \
+  } while (0)
+
+// End the coroutine block - sets state to -1 (done)
+#define coro_end(state_var) \
+  state_var = -1;           \
+  }                         \
   return 0
+
+// Reset coroutine to initial state
+#define coro_reset(state_var) ((state_var) = 0)
+
+// Check if coroutine has finished
+#define coro_done(state_var) ((state_var) == -1)
+
+// Check if coroutine is at the start
+#define coro_idle(state_var) ((state_var) == 0)
 ```
 
-These macros work together:
-- `COROUTINE_BEGIN`: Initializes the switch statement that dispatches to the saved execution point
-- `COROUTINE_YIELD`: Saves a unique counter value and returns, resuming at that point on next call
+### Core Macros
+
+- `coro_begin(state_var)`: Initializes the switch statement that dispatches to the saved execution point
+- `coro_yield(state_var)`: Saves a unique counter value and returns, resuming at that point on next call
   - Uses `__COUNTER__` for guaranteed uniqueness on each macro expansion
   - Widely supported across compilers (GCC, Clang, MSVC)
-- `COROUTINE_END`: Closes the coroutine
+- `coro_end(state_var)`: Closes the coroutine and marks it as done (-1)
+
+### Helper Macros
+
+- `coro_wait(state_var, condition)`: Yields repeatedly until condition becomes true
+  - Useful for "wait until animation finishes" patterns
+  - More concise than manual while+yield loops
+- `coro_reset(state_var)`: Resets coroutine to initial state (0)
+  - Called automatically when state changes in `sys_update_player_state`
+- `coro_done(state_var)`: Returns true if coroutine has finished
+  - Can be used to check if animation sequence is complete
+- `coro_idle(state_var)`: Returns true if coroutine hasn't started yet
+  - Useful for initialization checks
 
 ## Benefits of This Approach
 
@@ -62,7 +97,7 @@ All variables that need to survive across yields must be stored in the component
 ```c
 static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
                             C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Entry: Select appropriate fire animation
   if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
@@ -72,7 +107,7 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
   }
   
   // Wait one frame
-  COROUTINE_YIELD(ps->coroutine_state);
+  coro_yield(ps->coroutine_state);
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f) {
@@ -86,17 +121,17 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
     
     if (should_finish) {
       ps->current = PLAYER_STATE_IDLE;
-      COROUTINE_END;
+      coro_end;
     }
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
-  COROUTINE_END;
+  coro_end;
 }
 ```
 
 **Execution flow:**
-1. **First call**: Plays animation, hits `COROUTINE_YIELD`, saves line number and returns
+1. **First call**: Plays animation, hits `coro_yield`, saves line number and returns
 2. **Second call**: Resumes after first yield, checks animation state
 3. **Subsequent calls**: Keep looping until animation completes
 4. **On completion**: Transitions to IDLE and resets coroutine
@@ -138,9 +173,9 @@ int coroutine_state; // Tracks execution position for coroutine resume
 ```
 
 ### Added Coroutine Macros
-- `COROUTINE_BEGIN` - Start coroutine
-- `COROUTINE_YIELD` - Yield execution
-- `COROUTINE_END` - End coroutine
+- `coro_begin` - Start coroutine
+- `coro_yield` - Yield execution
+- `coro_end` - End coroutine
 
 ### Refactored Animation System
 - Created separate coroutine handler for each state
@@ -175,19 +210,19 @@ case PLAYER_STATE_FIRING:
 ### After (Stackless Coroutine)
 ```c
 static int anim_state_firing(...) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Setup
   cf_sprite_play(...);
-  COROUTINE_YIELD(ps->coroutine_state);
+  coro_yield(ps->coroutine_state);
   
   // Wait for completion
   while (!should_finish) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
   ps->current = PLAYER_STATE_IDLE;
-  COROUTINE_END;
+  coro_end;
 }
 ```
 

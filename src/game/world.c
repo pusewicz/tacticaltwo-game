@@ -18,27 +18,53 @@
 // =============================================================================
 // Coroutine Macros - Stackless coroutine using Duff's Device
 // =============================================================================
-// These macros enable resumable execution within animation state handlers.
-// Each state can yield execution and resume at the same point next frame.
-// This provides zero-overhead state persistence and trivial serialization.
+// A lightweight coroutine implementation using Duff's Device.
+// Coroutines can yield execution and resume where they left off,
+// making sequential animation logic easy to write.
+//
+// Based on Simon Tatham's coroutines and Scott Lembcke's state machines.
+// https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
+// https://www.slembcke.net/blog/StateMachines/
 //
 // Uses __COUNTER__ for unique case labels - widely supported across compilers
 // (GCC, Clang, MSVC) and guarantees uniqueness on each macro expansion.
 
-#define COROUTINE_BEGIN(state_var) \
-  switch (state_var) {             \
+// Begin a coroutine block
+#define coro_begin(state_var) \
+  switch (state_var) {        \
   case 0:;
 
-#define COROUTINE_YIELD(state_var) \
-  do {                             \
-    state_var = __COUNTER__;       \
-    return 0;                      \
-  case __COUNTER__:;               \
+// Yield execution - next call resumes at this point
+#define coro_yield(state_var) \
+  do {                        \
+    state_var = __COUNTER__;  \
+    return 0;                 \
+  case __COUNTER__:;          \
   } while (0)
 
-#define COROUTINE_END \
-  }                   \
+// Yield until condition becomes true
+#define coro_wait(state_var, condition) \
+  do {                                  \
+    state_var = __COUNTER__;            \
+  case __COUNTER__:                     \
+    if (!(condition))                   \
+      return 0;                         \
+  } while (0)
+
+// End the coroutine block - sets state to -1 (done)
+#define coro_end(state_var) \
+  state_var = -1;           \
+  }                         \
   return 0
+
+// Reset coroutine to initial state
+#define coro_reset(state_var) ((state_var) = 0)
+
+// Check if coroutine has finished (reached coro_end)
+#define coro_done(state_var) ((state_var) == -1)
+
+// Check if coroutine is at the start (never run or just reset)
+#define coro_idle(state_var) ((state_var) == 0)
 
 #include <cute_draw.h>
 #include <cute_hashtable.h>
@@ -211,7 +237,7 @@ static ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
 // Handler for IDLE state
 static int anim_state_idle(C_Sprite* sprite_comp, C_PlayerState* ps,
                           C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Play idle animation
   if (!cf_sprite_is_playing(sprite_comp, "GunAim")) {
@@ -221,16 +247,16 @@ static int anim_state_idle(C_Sprite* sprite_comp, C_PlayerState* ps,
   // Infinite loop - yield every frame until state changes externally
   // State transition handled by sys_update_player_state
   while (true) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // Handler for WALKING state
 static int anim_state_walking(C_Sprite* sprite_comp, C_PlayerState* ps,
                              C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Play walk animation
   if (!cf_sprite_is_playing(sprite_comp, "GunWalk")) {
@@ -240,16 +266,16 @@ static int anim_state_walking(C_Sprite* sprite_comp, C_PlayerState* ps,
   // Infinite loop - yield every frame until state changes externally
   // State transition handled by sys_update_player_state
   while (true) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // Handler for CROUCHING state
 static int anim_state_crouching(C_Sprite* sprite_comp, C_PlayerState* ps,
                                C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Play crouch animation
   if (!cf_sprite_is_playing(sprite_comp, "GunCrouch")) {
@@ -259,16 +285,16 @@ static int anim_state_crouching(C_Sprite* sprite_comp, C_PlayerState* ps,
   // Infinite loop - yield every frame until state changes externally
   // State transition handled by sys_update_player_state
   while (true) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // Handler for FIRING state
 static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
                             C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Entry: Select appropriate fire animation based on velocity
   if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
@@ -279,7 +305,7 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
   }
   
   // Wait one frame to let state_timer increment
-  COROUTINE_YIELD(ps->coroutine_state);
+  coro_yield(ps->coroutine_state);
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f) {
@@ -295,19 +321,19 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
     if (should_finish) {
       // Transition to IDLE (coroutine_state reset by sys_update_player_state)
       ps->current = PLAYER_STATE_IDLE;
-      COROUTINE_END;
+      coro_end(ps->coroutine_state);
     }
     
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // Handler for CROUCH_FIRING state
 static int anim_state_crouch_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
                                    C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Play crouch fire animation
   if (!cf_sprite_is_playing(sprite_comp, "GunCrouchFire")) {
@@ -315,23 +341,23 @@ static int anim_state_crouch_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
   }
   
   // Wait one frame to let state_timer increment
-  COROUTINE_YIELD(ps->coroutine_state);
+  coro_yield(ps->coroutine_state);
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f && !cf_sprite_will_finish(sprite_comp)) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
   // Transition to CROUCHING (coroutine_state reset by sys_update_player_state)
   ps->current = PLAYER_STATE_CROUCHING;
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // Handler for RELOADING state
 static int anim_state_reloading(C_Sprite* sprite_comp, C_PlayerState* ps,
                                C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_state);
+  coro_begin(ps->coroutine_state);
   
   // Play reload animation
   if (!cf_sprite_is_playing(sprite_comp, "GunReload")) {
@@ -339,17 +365,17 @@ static int anim_state_reloading(C_Sprite* sprite_comp, C_PlayerState* ps,
   }
   
   // Wait one frame to let state_timer increment
-  COROUTINE_YIELD(ps->coroutine_state);
+  coro_yield(ps->coroutine_state);
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f && !cf_sprite_will_finish(sprite_comp)) {
-    COROUTINE_YIELD(ps->coroutine_state);
+    coro_yield(ps->coroutine_state);
   }
   
   // Transition to IDLE (coroutine_state reset by sys_update_player_state)
   ps->current = PLAYER_STATE_IDLE;
   
-  COROUTINE_END;
+  coro_end(ps->coroutine_state);
 }
 
 // =============================================================================
