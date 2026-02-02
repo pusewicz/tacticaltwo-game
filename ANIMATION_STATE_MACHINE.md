@@ -45,7 +45,7 @@ struct C_PlayerState {
   PlayerState current;
   PlayerState previous;
   float state_timer;
-  int coroutine_line;  // Execution position
+  int coroutine_state;  // Execution position
 }
 ```
 
@@ -62,7 +62,7 @@ All variables that need to survive across yields must be stored in the component
 ```c
 static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
                             C_PlayerController* controller, C_Velocity* velocity) {
-  COROUTINE_BEGIN(ps->coroutine_line);
+  COROUTINE_BEGIN(ps->coroutine_state);
   
   // Entry: Select appropriate fire animation
   if (!cf_sprite_is_playing(sprite_comp, "GunFire") &&
@@ -72,7 +72,7 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
   }
   
   // Wait one frame
-  COROUTINE_YIELD(ps->coroutine_line);
+  COROUTINE_YIELD(ps->coroutine_state);
   
   // Wait for animation to complete
   while (ps->state_timer > 0.0f) {
@@ -88,7 +88,7 @@ static int anim_state_firing(C_Sprite* sprite_comp, C_PlayerState* ps,
       ps->current = PLAYER_STATE_IDLE;
       COROUTINE_END;
     }
-    COROUTINE_YIELD(ps->coroutine_line);
+    COROUTINE_YIELD(ps->coroutine_state);
   }
   
   COROUTINE_END;
@@ -120,7 +120,7 @@ Each animation state is now a separate coroutine function:
 ### State Transitions
 When a state change occurs:
 1. `sys_update_player_state` sets `ps->current` to the new state
-2. `ps->coroutine_line` is reset to 0
+2. `ps->coroutine_state` is reset to 0
 3. Next frame, the new coroutine starts from the beginning
 
 ### Execution Resume
@@ -128,13 +128,13 @@ Each frame:
 1. `sys_update_animation` calls the appropriate coroutine handler
 2. The switch statement jumps to the saved line number
 3. Coroutine executes until next `YIELD` or completion
-4. Execution state is automatically saved in `coroutine_line`
+4. Execution state is automatically saved in `coroutine_state`
 
 ## Changes Made
 
 ### Added to `C_PlayerState`
 ```c
-int coroutine_line; // Tracks execution position for coroutine resume
+int coroutine_state; // Tracks execution position for coroutine resume
 ```
 
 ### Added Coroutine Macros
@@ -148,8 +148,8 @@ int coroutine_line; // Tracks execution position for coroutine resume
 - State transitions explicitly reset coroutine position
 
 ### Updated State Management
-- `sys_update_player_state` resets `coroutine_line` on state change
-- `make_player` initializes `coroutine_line` to 0
+- `sys_update_player_state` resets `coroutine_state` on state change
+- `make_player` initializes `coroutine_state` to 0
 
 ## Comparison: Before vs After
 
@@ -175,15 +175,15 @@ case PLAYER_STATE_FIRING:
 ### After (Stackless Coroutine)
 ```c
 static int anim_state_firing(...) {
-  COROUTINE_BEGIN(ps->coroutine_line);
+  COROUTINE_BEGIN(ps->coroutine_state);
   
   // Setup
   cf_sprite_play(...);
-  COROUTINE_YIELD(ps->coroutine_line);
+  COROUTINE_YIELD(ps->coroutine_state);
   
   // Wait for completion
   while (!should_finish) {
-    COROUTINE_YIELD(ps->coroutine_line);
+    COROUTINE_YIELD(ps->coroutine_state);
   }
   
   ps->current = PLAYER_STATE_IDLE;
@@ -222,13 +222,13 @@ To save game state, simply serialize the component:
 fwrite(&ps->current, sizeof(PlayerState), 1, file);
 fwrite(&ps->previous, sizeof(PlayerState), 1, file);
 fwrite(&ps->state_timer, sizeof(float), 1, file);
-fwrite(&ps->coroutine_line, sizeof(int), 1, file);
+fwrite(&ps->coroutine_state, sizeof(int), 1, file);
 
 // Load
 fread(&ps->current, sizeof(PlayerState), 1, file);
 fread(&ps->previous, sizeof(PlayerState), 1, file);
 fread(&ps->state_timer, sizeof(float), 1, file);
-fread(&ps->coroutine_line, sizeof(int), 1, file);
+fread(&ps->coroutine_state, sizeof(int), 1, file);
 
 // Animation system will resume at the exact point it was saved!
 ```

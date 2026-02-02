@@ -129,7 +129,7 @@ typedef struct C_PlayerState {
   PlayerState current;
   PlayerState previous;
   float state_timer;
-  int coroutine_line; // Tracks execution position for coroutine resume
+  int coroutine_state; // Tracks execution position for coroutine resume
 } C_PlayerState;
 
 // C_Transform - Position and rotation
