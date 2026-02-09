@@ -16,6 +16,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# Enable position-independent code for all targets (required for shared libraries)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 add_subdirectory(vendor)
 add_subdirectory(src)
 
@@ -27,7 +30,7 @@ foreach(target ${TARGETS})
     target_compile_options(${target} PRIVATE
         $<$<C_COMPILER_ID:MSVC>:/W4;/D_CRT_SECURE_NO_WARNINGS;/Zc:preprocessor>
         $<$<AND:$<C_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/RTCcsu;/Zi>
-        $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wdouble-promotion;-Wstrict-prototypes;-Wmissing-prototypes;-fPIC>
+        $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wdouble-promotion;-Wstrict-prototypes;-Wmissing-prototypes>
         $<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-fanalyzer>
     )
 
