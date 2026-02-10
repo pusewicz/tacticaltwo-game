@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_filesystem.h>
+#include <SDL3/SDL_init.h>
 #include <SDL3/SDL_stdinc.h>
 #include <cute_app.h>
 #include <cute_defines.h>
@@ -34,9 +35,12 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
 
   log_info("platform", "Initializing platform...");
 
+  SDL_SetAppMetadata(GAME_NAME, GAME_VERSION, GAME_APP_ID);
+  SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
+
   int options = CF_APP_OPTIONS_RESIZABLE_BIT;
   CF_Result result =
-      cf_make_app("TacticalTwo", 0, 0, 0, CANVAS_WIDTH * CANVAS_SCALE,
+      cf_make_app(GAME_NAME, 0, 0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                   CANVAS_HEIGHT * CANVAS_SCALE, options, argv[0]);
 
   cf_set_fixed_timestep(60);
