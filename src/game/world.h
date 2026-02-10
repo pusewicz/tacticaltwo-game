@@ -6,6 +6,7 @@
 
 #include <cute.h>
 #include <cute_array.h>
+#include <cute_coroutine.h>
 #include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
@@ -125,12 +126,11 @@ typedef struct C_PlayerController {
   CF_V2 facing_direction; // Normalized, (1,0) = right
 } C_PlayerController;
 
-// C_PlayerState - Simple state machine
+// C_PlayerState - Coroutine-based state management
 // Tracks current player state for animation and behavior selection.
 typedef struct C_PlayerState {
   PlayerState current;
-  PlayerState previous;
-  float state_timer;
+  CF_Coroutine co;
 } C_PlayerState;
 
 // C_Transform - Position and rotation
@@ -152,21 +152,9 @@ typedef CF_Sprite C_Sprite;
 // Function Declarations
 // =============================================================================
 
-// Initialize world ECS and spawn player
 void init_world(void);
-
-// Update system callbacks after hot reload
 void world_hot_reload(void);
-
-// Main update function - runs all systems in order
 void update_world(float dt);
-
-// Render all sprites
 void render_world(void);
-
-// Cleanup world resources
 void shutdown_world(void);
-
-// Player factory function (creates entity and returns nothing - entity is
-// internal)
 void make_player(void);

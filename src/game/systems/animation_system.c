@@ -1,7 +1,10 @@
-// animation_system.c - Animation management system
+// animation_system.c - Coroutine-based player state and animation
 //
-// Maps player state to animation and updates sprite.
+// Single coroutine drives state transitions, animation selection, and sprite
+// updates.
 
+#include <cute_coroutine.h>
+#include <cute_math.h>
 #include <cute_sprite.h>
 #include <stddef.h>
 
@@ -10,108 +13,168 @@
 #include "world.h"
 
 // =============================================================================
-// Animation Mapping
+// Coroutine Helpers
 // =============================================================================
 
-static const char* state_to_animation(PlayerState ps) {
-  switch (ps) {
-  case PLAYER_STATE_IDLE:
-    return "GunAim";
-  case PLAYER_STATE_WALKING:
-    return "GunWalk";
-  case PLAYER_STATE_CROUCHING:
-  case PLAYER_STATE_CROUCH_WALKING:
-    return "GunCrouch";
-  case PLAYER_STATE_FIRING:
-    return "GunFire";
-  case PLAYER_STATE_CROUCH_FIRING:
-    return "GunCrouchFire";
-  case PLAYER_STATE_RELOADING:
-    return "GunReload";
-  default:
-    return "GunAim";
+// Per-frame helper: update facing direction from input, apply sprite flip,
+// update sprite
+static void player_tick(CF_Coroutine co) {
+  GameState* state           = (GameState*)cf_coroutine_get_udata(co);
+  ecs_entity_t player_entity = state->world.player;
+
+  auto controller = ECS_GET(player_entity, C_PlayerController);
+  auto input      = ECS_GET(player_entity, C_PlayerInput);
+  auto sprite     = ECS_GET(player_entity, C_Sprite);
+
+  // Update facing direction from input
+  if (input->right) {
+    controller->facing_direction = cf_v2(1.0f, 0.0f);
+  } else if (input->left) {
+    controller->facing_direction = cf_v2(-1.0f, 0.0f);
+  }
+
+  // Apply sprite flip
+  if (controller->facing_direction.x >= 0.0f) {
+    sprite->scale.x = 1.0f;
+  } else {
+    sprite->scale.x = -1.0f;
+  }
+
+  // Update sprite animation
+  cf_sprite_update(sprite);
+
+  // Yield to next frame
+  cf_coroutine_yield(co);
+}
+
+// =============================================================================
+// Coroutine Entry Point
+// =============================================================================
+
+static void player_behavior_fn(CF_Coroutine co) {
+  GameState* state           = (GameState*)cf_coroutine_get_udata(co);
+  ecs_entity_t player_entity = state->world.player;
+
+  while (true) {
+    auto ps       = ECS_GET(player_entity, C_PlayerState);
+    auto input    = ECS_GET(player_entity, C_PlayerInput);
+    auto sprite   = ECS_GET(player_entity, C_Sprite);
+    auto velocity = ECS_GET(player_entity, C_Velocity);
+
+    // Priority-based branching: shoot+crouch > shoot > reload > crouch > walk >
+    // idle
+
+    // Shoot + Crouch → Crouch Fire (one-shot, return to crouching)
+    if (input->shoot && input->crouch) {
+      ps->current = PLAYER_STATE_CROUCH_FIRING;
+      cf_sprite_play(sprite, "GunCrouchFire");
+
+      // Loop until animation finishes
+      while (!cf_sprite_will_finish(sprite)) {
+        player_tick(co);
+      }
+
+      // Return to crouching state
+      ps->current = PLAYER_STATE_CROUCHING;
+      cf_sprite_play(sprite, "GunCrouch");
+      player_tick(co);
+      continue;
+    }
+
+    // Shoot → Fire (one-shot, pick GunWalkFire vs GunFire based on velocity)
+    if (input->shoot) {
+      ps->current = PLAYER_STATE_FIRING;
+
+      // Pick animation based on current velocity
+      bool moving           = velocity->x != 0.0f;
+      const char* anim_name = moving ? "GunWalkFire" : "GunFire";
+      cf_sprite_play(sprite, anim_name);
+
+      // GunWalkFire has 8 frames but we only want 4 (one shot)
+      if (moving) {
+        while (cf_sprite_current_frame(sprite) < 3) {
+          player_tick(co);
+        }
+      } else {
+        // GunFire plays fully
+        while (!cf_sprite_will_finish(sprite)) {
+          player_tick(co);
+        }
+      }
+
+      // Return to idle
+      ps->current = PLAYER_STATE_IDLE;
+      cf_sprite_play(sprite, "GunAim");
+      player_tick(co);
+      continue;
+    }
+
+    // Reload → Reload (one-shot, return to idle)
+    if (input->reload) {
+      ps->current = PLAYER_STATE_RELOADING;
+      cf_sprite_play(sprite, "GunReload");
+
+      // Loop until animation finishes
+      while (!cf_sprite_will_finish(sprite)) {
+        player_tick(co);
+      }
+
+      // Return to idle
+      ps->current = PLAYER_STATE_IDLE;
+      cf_sprite_play(sprite, "GunAim");
+      player_tick(co);
+      continue;
+    }
+
+    // Crouch → Crouching (looping)
+    if (input->crouch) {
+      ps->current = PLAYER_STATE_CROUCHING;
+      if (!cf_sprite_is_playing(sprite, "GunCrouch")) {
+        cf_sprite_play(sprite, "GunCrouch");
+      }
+      player_tick(co);
+      continue;
+    }
+
+    // Walk → Walking (looping, requires horizontal velocity)
+    if (velocity->x != 0.0f) {
+      ps->current = PLAYER_STATE_WALKING;
+      if (!cf_sprite_is_playing(sprite, "GunWalk")) {
+        cf_sprite_play(sprite, "GunWalk");
+      }
+      player_tick(co);
+      continue;
+    }
+
+    // Idle → Idle (looping)
+    ps->current = PLAYER_STATE_IDLE;
+    if (!cf_sprite_is_playing(sprite, "GunAim")) {
+      cf_sprite_play(sprite, "GunAim");
+    }
+    player_tick(co);
   }
 }
 
 // =============================================================================
-// System: Update Animation
+// System: Player Coroutine
 // =============================================================================
-// Maps player state to animation and updates sprite.
+// Resumes player coroutine each frame, creates it if dead/uninitialized
 
 // NOLINTBEGIN
-ecs_ret_t sys_update_animation([[maybe_unused]] ecs_t* ecs,
+ecs_ret_t sys_player_coroutine([[maybe_unused]] ecs_t* ecs,
                                ecs_entity_t* entities, size_t count,
                                [[maybe_unused]] void* udata) {
   for (size_t i = 0; i < count; i++) {
-    auto sprite     = ECS_GET(entities[i], C_Sprite);
-    auto ps         = ECS_GET(entities[i], C_PlayerState);
-    auto controller = ECS_GET(entities[i], C_PlayerController);
-    auto velocity   = ECS_GET(entities[i], C_Velocity);
+    auto ps = ECS_GET(entities[i], C_PlayerState);
 
-    // Get animation name for current state
-    const char* anim_name = state_to_animation(ps->current);
-
-    // Use walk+fire animation if firing while moving
-    // Only pick fire animation at start of firing (don't switch mid-animation)
-    if (ps->current == PLAYER_STATE_FIRING) {
-      if (cf_sprite_is_playing(sprite, "GunFire") ||
-          cf_sprite_is_playing(sprite, "GunWalkFire")) {
-        // Already in firing animation - don't change it
-        anim_name = nullptr;
-      } else {
-        // Just started firing - pick animation based on current velocity
-        bool moving = velocity->x != 0.0f;
-        anim_name   = moving ? "GunWalkFire" : "GunFire";
-      }
+    // Create coroutine if uninitialized or dead
+    if (ps->co.id == 0 ||
+        cf_coroutine_state(ps->co) == CF_COROUTINE_STATE_DEAD) {
+      ps->co = cf_make_coroutine(player_behavior_fn, 0, state);
     }
 
-    // Crouch fire animation - no movement variant needed
-    if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-      if (cf_sprite_is_playing(sprite, "GunCrouchFire")) {
-        anim_name = nullptr;
-      } else {
-        anim_name = "GunCrouchFire";
-      }
-    }
-
-    // Only call cf_sprite_play when animation changes
-    if (anim_name && !cf_sprite_is_playing(sprite, anim_name)) {
-      cf_sprite_play(sprite, anim_name);
-    }
-
-    // Update sprite animation every frame
-    cf_sprite_update(sprite);
-
-    // Check if reloading or firing animation should finish
-    // Only check after at least one frame (state_timer > 0)
-    if (ps->state_timer > 0.0f && (ps->current == PLAYER_STATE_RELOADING ||
-                                   ps->current == PLAYER_STATE_FIRING ||
-                                   ps->current == PLAYER_STATE_CROUCH_FIRING)) {
-      bool should_finish = false;
-
-      // GunWalkFire has 8 frames but we only want 4 (one shot)
-      if (cf_sprite_is_playing(sprite, "GunWalkFire")) {
-        should_finish = cf_sprite_current_frame(sprite) >= 3;
-      } else {
-        should_finish = cf_sprite_will_finish(sprite);
-      }
-
-      if (should_finish) {
-        // Return to crouching if was crouch firing, otherwise idle
-        if (ps->current == PLAYER_STATE_CROUCH_FIRING) {
-          ps->current = PLAYER_STATE_CROUCHING;
-        } else {
-          ps->current = PLAYER_STATE_IDLE;
-        }
-      }
-    }
-
-    // Set horizontal flip based on facing direction
-    if (controller->facing_direction.x >= 0.0f) {
-      sprite->scale.x = 1.0f;
-    } else {
-      sprite->scale.x = -1.0f;
-    }
+    // Resume coroutine
+    cf_coroutine_resume(ps->co);
   }
 
   return 0;
