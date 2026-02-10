@@ -6,6 +6,7 @@
 
 #include <cute.h>
 #include <cute_array.h>
+#include <cute_coroutine.h>
 #include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
@@ -151,21 +152,9 @@ typedef CF_Sprite C_Sprite;
 // Function Declarations
 // =============================================================================
 
-// Initialize world ECS and spawn player
 void init_world(void);
-
-// Update system callbacks after hot reload
 void world_hot_reload(void);
-
-// Main update function - runs all systems in order
 void update_world(float dt);
-
-// Render all sprites
 void render_world(void);
-
-// Cleanup world resources
 void shutdown_world(void);
-
-// Player factory function (creates entity and returns nothing - entity is
-// internal)
 void make_player(void);

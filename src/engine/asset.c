@@ -1,5 +1,6 @@
 #include "asset.h"
 
+#include <cute_array.h>
 #include <cute_c_runtime.h>
 #include <cute_file_system.h>
 #include <cute_result.h>
