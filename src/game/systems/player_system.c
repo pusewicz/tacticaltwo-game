@@ -42,7 +42,6 @@ ecs_ret_t sys_update_player_movement([[maybe_unused]] ecs_t* ecs,
       // No vertical movement for side-scroller (no jumping initially)
       velocity->y = 0.0f;
     }
-
   }
 
   return 0;

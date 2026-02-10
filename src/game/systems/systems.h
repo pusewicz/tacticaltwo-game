@@ -24,7 +24,6 @@ ecs_ret_t sys_update_player_movement(ecs_t* ecs, ecs_entity_t* entities,
 ecs_ret_t sys_apply_velocity(ecs_t* ecs, ecs_entity_t* entities, size_t count,
                              void* udata);
 
-
 // Render system - draws sprites at transform positions
 ecs_ret_t sys_render_sprites(ecs_t* ecs, ecs_entity_t* entities, size_t count,
                              void* udata);

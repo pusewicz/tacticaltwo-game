@@ -19,6 +19,9 @@ end
 desc "Build RelWithDebInfo configuration (default)"
 task default: "cmake:build"
 
+desc "Build RelWithDebInfo configuration (default)"
+task build: "cmake:build"
+
 desc "Run the game"
 task :run do
   sh "ninja -C build/relwithdebinfo"

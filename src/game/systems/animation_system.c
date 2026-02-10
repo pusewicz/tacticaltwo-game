@@ -1,8 +1,10 @@
 // animation_system.c - Coroutine-based player state and animation
 //
-// Single coroutine drives state transitions, animation selection, and sprite updates.
+// Single coroutine drives state transitions, animation selection, and sprite
+// updates.
 
 #include <cute_coroutine.h>
+#include <cute_math.h>
 #include <cute_sprite.h>
 #include <stddef.h>
 
@@ -14,14 +16,15 @@
 // Coroutine Helpers
 // =============================================================================
 
-// Per-frame helper: update facing direction from input, apply sprite flip, update sprite
+// Per-frame helper: update facing direction from input, apply sprite flip,
+// update sprite
 static void player_tick(CF_Coroutine co) {
-  GameState* state = (GameState*)cf_coroutine_get_udata(co);
+  GameState* state           = (GameState*)cf_coroutine_get_udata(co);
   ecs_entity_t player_entity = state->world.player;
 
   auto controller = ECS_GET(player_entity, C_PlayerController);
-  auto input = ECS_GET(player_entity, C_PlayerInput);
-  auto sprite = ECS_GET(player_entity, C_Sprite);
+  auto input      = ECS_GET(player_entity, C_PlayerInput);
+  auto sprite     = ECS_GET(player_entity, C_Sprite);
 
   // Update facing direction from input
   if (input->right) {
@@ -49,16 +52,17 @@ static void player_tick(CF_Coroutine co) {
 // =============================================================================
 
 static void player_behavior_fn(CF_Coroutine co) {
-  GameState* state = (GameState*)cf_coroutine_get_udata(co);
+  GameState* state           = (GameState*)cf_coroutine_get_udata(co);
   ecs_entity_t player_entity = state->world.player;
 
   while (true) {
-    auto ps = ECS_GET(player_entity, C_PlayerState);
-    auto input = ECS_GET(player_entity, C_PlayerInput);
-    auto sprite = ECS_GET(player_entity, C_Sprite);
+    auto ps       = ECS_GET(player_entity, C_PlayerState);
+    auto input    = ECS_GET(player_entity, C_PlayerInput);
+    auto sprite   = ECS_GET(player_entity, C_Sprite);
     auto velocity = ECS_GET(player_entity, C_Velocity);
 
-    // Priority-based branching: shoot+crouch > shoot > reload > crouch > walk > idle
+    // Priority-based branching: shoot+crouch > shoot > reload > crouch > walk >
+    // idle
 
     // Shoot + Crouch → Crouch Fire (one-shot, return to crouching)
     if (input->shoot && input->crouch) {
@@ -82,7 +86,7 @@ static void player_behavior_fn(CF_Coroutine co) {
       ps->current = PLAYER_STATE_FIRING;
 
       // Pick animation based on current velocity
-      bool moving = velocity->x != 0.0f;
+      bool moving           = velocity->x != 0.0f;
       const char* anim_name = moving ? "GunWalkFire" : "GunFire";
       cf_sprite_play(sprite, anim_name);
 
@@ -164,7 +168,8 @@ ecs_ret_t sys_player_coroutine([[maybe_unused]] ecs_t* ecs,
     auto ps = ECS_GET(entities[i], C_PlayerState);
 
     // Create coroutine if uninitialized or dead
-    if (ps->co.id == 0 || cf_coroutine_state(ps->co) == CF_COROUTINE_STATE_DEAD) {
+    if (ps->co.id == 0 ||
+        cf_coroutine_state(ps->co) == CF_COROUTINE_STATE_DEAD) {
       ps->co = cf_make_coroutine(player_behavior_fn, 0, state);
     }
 
