@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sdl-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/jvolden/mcp-sdl",
+        "mcp-sdl"
+      ]
+    }
+  }
+}
