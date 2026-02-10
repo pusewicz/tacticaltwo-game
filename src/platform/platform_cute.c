@@ -39,6 +39,9 @@ void platform_init(int argc [[maybe_unused]], char* argv[]) {
   SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
   int options = CF_APP_OPTIONS_RESIZABLE_BIT;
+#ifdef DEBUG
+  options |= CF_APP_OPTIONS_GFX_DEBUG_BIT;
+#endif
   CF_Result result =
       cf_make_app(GAME_NAME, 0, 0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                   CANVAS_HEIGHT * CANVAS_SCALE, options, argv[0]);
