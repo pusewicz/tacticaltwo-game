@@ -7,7 +7,7 @@
 
 #include "world.h"
 
-#include <cute_hashtable.h>
+#include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
 
@@ -161,9 +161,9 @@ void shutdown_world(void) {
     state->world.ecs = nullptr;
   }
   if (state->world.components) {
-    hfree(state->world.components);
+    cf_map_free(state->world.components);
   }
   if (state->world.systems) {
-    hfree(state->world.systems);
+    cf_map_free(state->world.systems);
   }
 }

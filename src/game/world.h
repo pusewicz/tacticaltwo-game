@@ -5,7 +5,8 @@
 #pragma once
 
 #include <cute.h>
-#include <cute_hashtable.h>
+#include <cute_array.h>
+#include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
 #include <cute_string.h>
@@ -20,29 +21,31 @@
 #define ECS_ENTITY_COUNT 4096
 #endif
 
-#define ECS_GET_COMP(COMP) hget(state->world.components, sintern(#COMP))
+#define ECS_GET_COMP(COMP)                                                     \
+  cf_map_get(state->world.components, cf_sintern(#COMP))
 
-#define ECS_GET_SYSTEM(SYSTEM) hget(state->world.systems, sintern(#SYSTEM))
+#define ECS_GET_SYSTEM(SYSTEM)                                                 \
+  cf_map_get(state->world.systems, cf_sintern(#SYSTEM))
 
 #define ECS_REGISTER_COMP(COMP)                                                \
   do {                                                                         \
     ecs_comp_t id = ecs_define_component(state->world.ecs, sizeof(COMP),       \
                                          nullptr, nullptr);                    \
-    hset(state->world.components, sintern(#COMP), id);                         \
+    cf_map_set(state->world.components, cf_sintern(#COMP), id);                \
   } while (0)
 
 #define ECS_REGISTER_COMP_CB(COMP, CTOR, DTOR)                                 \
   do {                                                                         \
     ecs_comp_t id =                                                            \
         ecs_define_component(state->world.ecs, sizeof(COMP), CTOR, DTOR);      \
-    hset(state->world.components, sintern(#COMP), id);                         \
+    cf_map_set(state->world.components, cf_sintern(#COMP), id);                \
   } while (0)
 
 #define ECS_REGISTER_SYSTEM(SYSTEM, UDATA)                                     \
   do {                                                                         \
     ecs_system_t id = ecs_define_system(state->world.ecs, 0, SYSTEM, nullptr,  \
                                         nullptr, UDATA);                       \
-    hset(state->world.systems, sintern(#SYSTEM), id);                          \
+    cf_map_set(state->world.systems, cf_sintern(#SYSTEM), id);                 \
   } while (0)
 
 #define ECS_REQUIRE_COMP(SYSTEM, COMP)                                         \
@@ -72,8 +75,8 @@
 
 typedef struct World {
   ecs_t* ecs;
-  htbl ecs_comp_t* components;
-  htbl ecs_system_t* systems;
+  CF_MAP(ecs_comp_t) components;
+  CF_MAP(ecs_system_t) systems;
   float dt;
   ecs_entity_t player;
 } World;
