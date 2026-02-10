@@ -125,12 +125,11 @@ typedef struct C_PlayerController {
   CF_V2 facing_direction; // Normalized, (1,0) = right
 } C_PlayerController;
 
-// C_PlayerState - Simple state machine
+// C_PlayerState - Coroutine-based state management
 // Tracks current player state for animation and behavior selection.
 typedef struct C_PlayerState {
   PlayerState current;
-  PlayerState previous;
-  float state_timer;
+  CF_Coroutine co;
 } C_PlayerState;
 
 // C_Transform - Position and rotation

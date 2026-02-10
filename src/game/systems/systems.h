@@ -14,9 +14,9 @@
 ecs_ret_t sys_gather_input(ecs_t* ecs, ecs_entity_t* entities, size_t count,
                            void* udata);
 
-// Player systems - state machine and movement
-ecs_ret_t sys_update_player_state(ecs_t* ecs, ecs_entity_t* entities,
-                                  size_t count, void* udata);
+// Player systems - coroutine-based state and movement
+ecs_ret_t sys_player_coroutine(ecs_t* ecs, ecs_entity_t* entities, size_t count,
+                               void* udata);
 ecs_ret_t sys_update_player_movement(ecs_t* ecs, ecs_entity_t* entities,
                                      size_t count, void* udata);
 
@@ -24,9 +24,6 @@ ecs_ret_t sys_update_player_movement(ecs_t* ecs, ecs_entity_t* entities,
 ecs_ret_t sys_apply_velocity(ecs_t* ecs, ecs_entity_t* entities, size_t count,
                              void* udata);
 
-// Animation system - state-to-animation mapping and sprite updates
-ecs_ret_t sys_update_animation(ecs_t* ecs, ecs_entity_t* entities, size_t count,
-                               void* udata);
 
 // Render system - draws sprites at transform positions
 ecs_ret_t sys_render_sprites(ecs_t* ecs, ecs_entity_t* entities, size_t count,
