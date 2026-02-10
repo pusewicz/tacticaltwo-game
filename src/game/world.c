@@ -163,9 +163,11 @@ void shutdown_world(void) {
     ecs_free(state->world.ecs);
     state->world.ecs = nullptr;
   }
+
   if (state->world.components) {
     cf_map_free(state->world.components);
   }
+
   if (state->world.systems) {
     cf_map_free(state->world.systems);
   }
