@@ -11,8 +11,10 @@
 #include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
+#include <mruby/gc.h>
 
 #include "../engine/game_state.h"
+#include "scripting/scripting.h"
 #include "systems/systems.h"
 
 // =============================================================================
@@ -52,11 +54,32 @@ void make_player(void) {
 
   // Start with walk animation
   cf_sprite_play(sprite, "GunWalk");
+
+  scripting_attach(player, "assets/scripts/player.rb");
+}
+
+// =============================================================================
+// Hello Entity Factory
+// =============================================================================
+
+static void make_hello_entity(void) {
+  ecs_entity_t entity = ecs_create(state->world.ecs);
+  scripting_attach(entity, "assets/scripts/hello.rb");
 }
 
 // =============================================================================
 // World Initialization
 // =============================================================================
+
+static void script_dtor([[maybe_unused]] ecs_t* ecs, [[maybe_unused]] ecs_entity_t entity,
+                        void* comp_ptr) {
+  if (!state->mrb) {
+    return;
+  }
+  C_Script* script = (C_Script*)comp_ptr;
+  mrb_gc_unregister(state->mrb, script->fiber);
+  mrb_gc_unregister(state->mrb, script->entity_obj);
+}
 
 // NOLINTBEGIN
 void init_world(void) {
@@ -73,6 +96,7 @@ void init_world(void) {
   ECS_REGISTER_COMP(C_Transform);
   ECS_REGISTER_COMP(C_Velocity);
   ECS_REGISTER_COMP(C_Sprite);
+  ECS_REGISTER_COMP_CB(C_Script, nullptr, script_dtor);
 
   // Register systems
   ECS_REGISTER_SYSTEM(sys_gather_input, nullptr);
@@ -95,8 +119,12 @@ void init_world(void) {
   ECS_REQUIRE_COMP(sys_render_sprites, C_Sprite);
   ECS_REQUIRE_COMP(sys_render_sprites, C_Transform);
 
+  ECS_REGISTER_SYSTEM(sys_scripting, nullptr);
+  ECS_REQUIRE_COMP(sys_scripting, C_Script);
+
   // Create player using factory function
   make_player();
+  make_hello_entity();
 }
 // NOLINTEND
 
@@ -110,6 +138,10 @@ void update_world(float dt) {
 
   // Input
   ECS_RUN_SYSTEM(sys_gather_input);
+
+  // Scripting - global level scripts, then per-entity fiber behaviors
+  scripting_update(dt);
+  ECS_RUN_SYSTEM(sys_scripting);
 
   // Logic - coroutine drives state and animation
   ECS_RUN_SYSTEM(sys_player_coroutine);
@@ -146,6 +178,7 @@ void world_hot_reload(void) {
   ECS_UPDATE_SYSTEM(sys_update_player_movement, nullptr);
   ECS_UPDATE_SYSTEM(sys_apply_velocity, nullptr);
   ECS_UPDATE_SYSTEM(sys_render_sprites, nullptr);
+  ECS_UPDATE_SYSTEM(sys_scripting, nullptr);
 }
 
 // =============================================================================

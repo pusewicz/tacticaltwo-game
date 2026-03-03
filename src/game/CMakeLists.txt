@@ -8,11 +8,14 @@ add_library(${NAME} SHARED
   systems/physics_system.c
   systems/animation_system.c
   systems/render_system.c
+  scripting/scripting.c
+  scripting/bindings.c
+  systems/scripting_system.c
   ../engine/asset.c
   ../engine/log.c
 )
 target_include_directories(${NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(${NAME} PRIVATE cute)
+target_link_libraries(${NAME} PRIVATE cute mruby)
 
 if(ENABLE_HOT_RELOADING)
   # Copy game library to appropriate location

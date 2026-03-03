@@ -11,6 +11,7 @@
 #include <cute_math.h>
 #include <cute_sprite.h>
 #include <cute_string.h>
+#include <mruby.h>
 #include <pico_ecs.h>
 #include <stdbool.h>
 
@@ -63,6 +64,9 @@
 
 #define ECS_GET(ENTITY, COMP)                                                  \
   (COMP*)ecs_get(state->world.ecs, ENTITY, ECS_GET_COMP(COMP))
+
+#define ECS_HAS(ENTITY, COMP)                                                  \
+  ecs_has(state->world.ecs, ENTITY, ECS_GET_COMP(COMP))
 
 #define ECS_ADD(ENTITY, COMP)                                                  \
   (COMP*)ecs_add(state->world.ecs, ENTITY, ECS_GET_COMP(COMP), nullptr)
@@ -147,6 +151,15 @@ typedef CF_V2 C_Velocity;
 // C_Sprite - Sprite and animation component
 // Holds sprite data for rendering and animation.
 typedef CF_Sprite C_Sprite;
+
+// C_Script - Ruby scripting component
+// Holds a Ruby Fiber for per-entity behavior scripting.
+typedef struct C_Script {
+  mrb_value   fiber;      // Ruby Fiber driving this entity's behavior
+  mrb_value   entity_obj; // Cached Ruby Entity instance (GC-rooted)
+  const char* path;       // Interned path to the script file (for reloading)
+  bool        active;     // Whether this script is currently running
+} C_Script;
 
 // =============================================================================
 // Function Declarations

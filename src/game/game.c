@@ -18,6 +18,7 @@
 #include "../config/config.h"
 #include "../engine/game_state.h"
 #include "../engine/platform.h"
+#include "scripting/scripting.h"
 #include "world.h"
 
 GameState* state = nullptr;
@@ -55,6 +56,7 @@ void game_init(Platform* platform) {
   cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                                  CANVAS_HEIGHT * CANVAS_SCALE));
 
+  scripting_init();
   init_world();
 
   cf_app_init_imgui();
@@ -109,6 +111,7 @@ void game_render(void) {
 
 void game_shutdown(void) {
   shutdown_world();
+  scripting_shutdown();
   free(state->scratch_arena);
   free(state);
 }
@@ -117,5 +120,6 @@ void* game_state(void) { return state; }
 
 void game_hot_reload(void* game_state) {
   state = (GameState*)game_state;
+  scripting_hot_reload();
   world_hot_reload();
 }

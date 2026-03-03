@@ -27,3 +27,7 @@ ecs_ret_t sys_apply_velocity(ecs_t* ecs, ecs_entity_t* entities, size_t count,
 // Render system - draws sprites at transform positions
 ecs_ret_t sys_render_sprites(ecs_t* ecs, ecs_entity_t* entities, size_t count,
                              void* udata);
+
+// Scripting system - resumes per-entity Ruby fibers
+ecs_ret_t sys_scripting(ecs_t* ecs, ecs_entity_t* entities, size_t count,
+                        void* udata);

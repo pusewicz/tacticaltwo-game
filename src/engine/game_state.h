@@ -6,6 +6,7 @@
 #include "world.h"
 
 typedef struct Platform Platform;
+typedef struct mrb_state mrb_state;
 
 typedef struct GameState {
   Platform* platform;
@@ -16,6 +17,7 @@ typedef struct GameState {
   bool debug_mode;
 
   World world;
+  mrb_state* mrb; // mruby VM — survives hot reloads
 } GameState;
 
 extern GameState* state;
