@@ -43,9 +43,6 @@ foreach(target ${TARGETS})
         LOG_SOURCE_DIR="${PROJECT_SOURCE_DIR}/src/"
     )
 
-    target_include_directories(${target} SYSTEM PRIVATE
-        ${PROJECT_SOURCE_DIR}/vendor/empyreanx
-    )
 endforeach()
 
 # Output status of hot-reloading
