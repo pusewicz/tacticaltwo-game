@@ -11,8 +11,6 @@
 #include <cute_sprite.h>
 #include <cute_time.h>
 #include <dcimgui.h>
-#include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "../config/config.h"
@@ -51,7 +49,7 @@ void game_init(Platform* platform) {
   state->canvas =
       cf_make_canvas(cf_canvas_defaults(CANVAS_WIDTH, CANVAS_HEIGHT));
 
-  // Set up projection for the game vcanvas
+  // Set up projection for the game canvas
   cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                                  CANVAS_HEIGHT * CANVAS_SCALE));
 
@@ -100,7 +98,7 @@ void game_render(void) {
     cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
     cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
 
-    // Restore pojection for the next frame
+    // Restore projection for the next frame
     cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
   }
 
@@ -109,6 +107,8 @@ void game_render(void) {
 
 void game_shutdown(void) {
   shutdown_world();
+  cf_destroy_canvas(state->canvas);
+  cf_destroy_arena(state->scratch_arena);
   free(state->scratch_arena);
   free(state);
 }

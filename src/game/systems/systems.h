@@ -1,6 +1,7 @@
 // systems.h - System function declarations
 //
-// Systems iterate world entities directly, filtering by component enabled flags.
+// Systems iterate world entities directly, filtering by component enabled
+// flags.
 
 #pragma once
 

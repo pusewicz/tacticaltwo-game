@@ -105,7 +105,8 @@ typedef struct World {
 // Entity Management
 // =============================================================================
 
-// Find a free slot and mark it as existing. Returns index, or ENTITY_NONE if full.
+// Find a free slot and mark it as existing. Returns index, or ENTITY_NONE if
+// full.
 int world_add_entity(Entity e);
 
 // Mark entity slot as free.

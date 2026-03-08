@@ -41,12 +41,12 @@ static void make_player(void) {
   cf_sprite_play(&player_sprite, "GunWalk");
 
   int id = world_add_entity((Entity){
-      .exists = true,
+      .exists       = true,
       .player_input = {.enabled = true},
       .player_controller =
           {
-              .enabled = true,
-              .walk_speed = 150.0f,
+              .enabled          = true,
+              .walk_speed       = 150.0f,
               .facing_direction = cf_v2(1.0f, 0.0f),
           },
       .player_state =
@@ -56,14 +56,14 @@ static void make_player(void) {
           },
       .transform =
           {
-              .enabled = true,
+              .enabled  = true,
               .position = cf_v2(0.0f, 0.0f),
           },
       .velocity = {.enabled = true},
       .sprite =
           {
               .enabled = true,
-              .sprite = player_sprite,
+              .sprite  = player_sprite,
           },
   });
 
