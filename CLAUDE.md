@@ -32,7 +32,7 @@ git submodule update --init --recursive
 - `src/engine/` - Engine utilities (logging, state)
 - `src/config/` - Configuration constants
 - `src/platform/` - Platform abstraction (Cute Framework)
-- `vendor/` - Third-party dependencies (includes `empyreanx/pico_ecs.h`)
+- `vendor/` - Third-party dependencies (cute_framework)
 - `assets/` - Game assets (mounted at `/assets` in CF filesystem)
 - `tools/` - Development tools
   - `aseprite` - Inspect .ase files (tags, layers, durations). Use `--json` or `--c-header` for output formats.
