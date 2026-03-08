@@ -6,13 +6,20 @@
 
 #include "../../engine/game_state.h"
 #include "../world.h"
+#include "systems.h"
 
 void sys_render_sprites(void) {
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];
-    if (!e->exists) continue;
-    if (!e->sprite.enabled) continue;
-    if (!e->transform.enabled) continue;
+    if (!e->exists) {
+      continue;
+    }
+    if (!e->sprite.enabled) {
+      continue;
+    }
+    if (!e->transform.enabled) {
+      continue;
+    }
 
     cf_draw_push();
     cf_draw_translate(e->transform.position.x, e->transform.position.y);

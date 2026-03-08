@@ -6,12 +6,17 @@
 
 #include "../../engine/game_state.h"
 #include "../world.h"
+#include "systems.h"
 
 void sys_gather_input(void) {
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];
-    if (!e->exists) continue;
-    if (!e->player_input.enabled) continue;
+    if (!e->exists) {
+      continue;
+    }
+    if (!e->player_input.enabled) {
+      continue;
+    }
 
     e->player_input.up    = cf_key_down(CF_KEY_W) || cf_key_down(CF_KEY_UP);
     e->player_input.down  = cf_key_down(CF_KEY_S) || cf_key_down(CF_KEY_DOWN);

@@ -6,15 +6,26 @@
 
 #include "../../engine/game_state.h"
 #include "../world.h"
+#include "systems.h"
 
 void sys_update_player_movement(void) {
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];
-    if (!e->exists) continue;
-    if (!e->velocity.enabled) continue;
-    if (!e->player_controller.enabled) continue;
-    if (!e->player_state.enabled) continue;
-    if (!e->player_input.enabled) continue;
+    if (!e->exists) {
+      continue;
+    }
+    if (!e->velocity.enabled) {
+      continue;
+    }
+    if (!e->player_controller.enabled) {
+      continue;
+    }
+    if (!e->player_state.enabled) {
+      continue;
+    }
+    if (!e->player_input.enabled) {
+      continue;
+    }
 
     if (e->player_state.current == PLAYER_STATE_CROUCHING ||
         e->player_state.current == PLAYER_STATE_CROUCH_FIRING) {

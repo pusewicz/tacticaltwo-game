@@ -9,6 +9,7 @@
 
 #include "../../engine/game_state.h"
 #include "../world.h"
+#include "systems.h"
 
 // =============================================================================
 // Coroutine Helpers
@@ -126,8 +127,12 @@ static void player_behavior_fn(CF_Coroutine co) {
 void sys_player_coroutine(void) {
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];
-    if (!e->exists) continue;
-    if (!e->player_state.enabled) continue;
+    if (!e->exists) {
+      continue;
+    }
+    if (!e->player_state.enabled) {
+      continue;
+    }
 
     if (e->player_state.co.id == 0 ||
         cf_coroutine_state(e->player_state.co) == CF_COROUTINE_STATE_DEAD) {
