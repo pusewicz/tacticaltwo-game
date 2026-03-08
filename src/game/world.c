@@ -1,174 +1,115 @@
-// world.c - ECS World Management
+// world.c - World management with fat struct entities
 //
-// Initializes ECS, registers components and systems, manages world lifecycle.
-// System implementations are in the systems/ directory.
-
-#define PICO_ECS_IMPLEMENTATION
+// Entity lifecycle, player factory, and system dispatch.
 
 #include "world.h"
 
 #include <cute_coroutine.h>
-#include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
+#include <string.h>
 
 #include "../engine/game_state.h"
 #include "systems/systems.h"
 
 // =============================================================================
+// Entity Management
+// =============================================================================
+
+int world_add_entity(Entity e) {
+  for (int i = 0; i < MAX_ENTITIES; i++) {
+    if (!state->world.entities[i].exists) {
+      state->world.entities[i] = e;
+      return i;
+    }
+  }
+  return ENTITY_NONE;
+}
+
+void world_remove_entity(int id) {
+  if (id >= 0 && id < MAX_ENTITIES) {
+    memset(&state->world.entities[id], 0, sizeof(Entity));
+  }
+}
+
+// =============================================================================
 // Player Factory
 // =============================================================================
 
-void make_player(void) {
-  // Create player entity and store in world
-  ecs_entity_t player = ecs_create(state->world.ecs);
-  state->world.player = player;
+static void make_player(void) {
+  CF_Sprite player_sprite = cf_make_sprite("assets/sprites/player_combat.ase");
+  cf_sprite_play(&player_sprite, "GunWalk");
 
-  // Add components to player
-  ECS_ADD(player, C_PlayerInput);
+  int id = world_add_entity((Entity){
+      .exists = true,
+      .player_input = {.enabled = true},
+      .player_controller =
+          {
+              .enabled = true,
+              .walk_speed = 150.0f,
+              .facing_direction = cf_v2(1.0f, 0.0f),
+          },
+      .player_state =
+          {
+              .enabled = true,
+              .current = PLAYER_STATE_IDLE,
+          },
+      .transform =
+          {
+              .enabled = true,
+              .position = cf_v2(0.0f, 0.0f),
+          },
+      .velocity = {.enabled = true},
+      .sprite =
+          {
+              .enabled = true,
+              .sprite = player_sprite,
+          },
+  });
 
-  // Initialize player controller with default speeds
-  auto controller              = ECS_ADD(player, C_PlayerController);
-  controller->walk_speed       = 150.0f;
-  controller->facing_direction = cf_v2(1.0f, 0.0f); // Default: facing right
-
-  // Initialize player state
-  auto ps     = ECS_ADD(player, C_PlayerState);
-  ps->current = PLAYER_STATE_IDLE;
-  ps->co.id   = 0; // Coroutine created on first tick
-
-  // Initialize transform at center of screen (CF origin is at center)
-  auto transform      = ECS_ADD(player, C_Transform);
-  transform->position = cf_v2(0.0f, 0.0f);
-  transform->rotation = 0.0f;
-
-  // Initialize velocity (stationary)
-  auto velocity = ECS_ADD(player, C_Velocity);
-  *velocity     = cf_v2(0.0f, 0.0f);
-
-  // Initialize sprite with player_combat.ase (gun animations)
-  auto sprite = ECS_ADD(player, C_Sprite);
-  *sprite     = cf_make_sprite("assets/sprites/player_combat.ase");
-
-  // Start with walk animation
-  cf_sprite_play(sprite, "GunWalk");
+  state->world.player = id;
 }
 
 // =============================================================================
-// World Initialization
+// World Lifecycle
 // =============================================================================
 
-// NOLINTBEGIN
 void init_world(void) {
-  // Create ECS context
-  state->world.ecs        = ecs_new(ECS_ENTITY_COUNT, nullptr);
-  state->world.components = nullptr;
-  state->world.systems    = nullptr;
-  state->world.dt         = 0.0f;
-
-  // Register components
-  ECS_REGISTER_COMP(C_PlayerInput);
-  ECS_REGISTER_COMP(C_PlayerController);
-  ECS_REGISTER_COMP(C_PlayerState);
-  ECS_REGISTER_COMP(C_Transform);
-  ECS_REGISTER_COMP(C_Velocity);
-  ECS_REGISTER_COMP(C_Sprite);
-
-  // Register systems
-  ECS_REGISTER_SYSTEM(sys_gather_input, nullptr);
-  ECS_REQUIRE_COMP(sys_gather_input, C_PlayerInput);
-
-  ECS_REGISTER_SYSTEM(sys_player_coroutine, nullptr);
-  ECS_REQUIRE_COMP(sys_player_coroutine, C_PlayerState);
-
-  ECS_REGISTER_SYSTEM(sys_update_player_movement, nullptr);
-  ECS_REQUIRE_COMP(sys_update_player_movement, C_Velocity);
-  ECS_REQUIRE_COMP(sys_update_player_movement, C_PlayerController);
-  ECS_REQUIRE_COMP(sys_update_player_movement, C_PlayerState);
-  ECS_REQUIRE_COMP(sys_update_player_movement, C_PlayerInput);
-
-  ECS_REGISTER_SYSTEM(sys_apply_velocity, nullptr);
-  ECS_REQUIRE_COMP(sys_apply_velocity, C_Transform);
-  ECS_REQUIRE_COMP(sys_apply_velocity, C_Velocity);
-
-  ECS_REGISTER_SYSTEM(sys_render_sprites, nullptr);
-  ECS_REQUIRE_COMP(sys_render_sprites, C_Sprite);
-  ECS_REQUIRE_COMP(sys_render_sprites, C_Transform);
-
-  // Create player using factory function
+  memset(&state->world, 0, sizeof(World));
+  state->world.player = ENTITY_NONE;
   make_player();
 }
-// NOLINTEND
-
-// =============================================================================
-// Main Update Function
-// =============================================================================
-// Runs systems in explicit order for control over execution pipeline.
 
 void update_world(float dt) {
   state->world.dt = dt;
 
-  // Input
-  ECS_RUN_SYSTEM(sys_gather_input);
-
-  // Logic - coroutine drives state and animation
-  ECS_RUN_SYSTEM(sys_player_coroutine);
-  ECS_RUN_SYSTEM(sys_update_player_movement);
-
-  // Physics
-  ECS_RUN_SYSTEM(sys_apply_velocity);
+  sys_gather_input();
+  sys_player_coroutine();
+  sys_update_player_movement();
+  sys_apply_velocity();
 }
 
-// =============================================================================
-// Render World
-// =============================================================================
-// Renders all sprites using the render system.
-
-void render_world(void) { ECS_RUN_SYSTEM(sys_render_sprites); }
-
-// =============================================================================
-// Hot Reload
-// =============================================================================
-// Updates system callbacks after the game library is reloaded.
-// Function pointers become stale when the library is unloaded/reloaded.
+void render_world(void) { sys_render_sprites(); }
 
 void world_hot_reload(void) {
-  // Destroy stale coroutine (saved context points to old code segment)
-  auto ps = ECS_GET(state->world.player, C_PlayerState);
-  if (ps->co.id != 0) {
-    cf_destroy_coroutine(ps->co);
-    ps->co.id = 0; // Will be recreated on next tick
+  int p = state->world.player;
+  if (p == ENTITY_NONE) {
+    return;
   }
 
-  // Update system callbacks
-  ECS_UPDATE_SYSTEM(sys_gather_input, nullptr);
-  ECS_UPDATE_SYSTEM(sys_player_coroutine, nullptr);
-  ECS_UPDATE_SYSTEM(sys_update_player_movement, nullptr);
-  ECS_UPDATE_SYSTEM(sys_apply_velocity, nullptr);
-  ECS_UPDATE_SYSTEM(sys_render_sprites, nullptr);
+  Entity* player = &state->world.entities[p];
+  if (player->player_state.enabled && player->player_state.co.id != 0) {
+    cf_destroy_coroutine(player->player_state.co);
+    player->player_state.co.id = 0;
+  }
 }
 
-// =============================================================================
-// Shutdown
-// =============================================================================
-
 void shutdown_world(void) {
-  // Destroy coroutine before freeing ECS
-  auto ps = ECS_GET(state->world.player, C_PlayerState);
-  if (ps->co.id != 0) {
-    cf_destroy_coroutine(ps->co);
-  }
-
-  if (state->world.ecs) {
-    ecs_free(state->world.ecs);
-    state->world.ecs = nullptr;
-  }
-
-  if (state->world.components) {
-    cf_map_free(state->world.components);
-  }
-
-  if (state->world.systems) {
-    cf_map_free(state->world.systems);
+  // Destroy any active coroutines
+  for (int i = 0; i < MAX_ENTITIES; i++) {
+    Entity* e = &state->world.entities[i];
+    if (e->exists && e->player_state.enabled && e->player_state.co.id != 0) {
+      cf_destroy_coroutine(e->player_state.co);
+    }
   }
 }

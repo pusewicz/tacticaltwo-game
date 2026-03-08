@@ -1,86 +1,22 @@
-// world.h - ECS Components
+// world.h - Fat struct entity system
 //
-// Player input and controller components for grounded tactical movement.
+// Monolithic entity struct with embedded component data.
+// Systems iterate a fixed array, filtering by enabled flags.
 
 #pragma once
 
 #include <cute.h>
-#include <cute_array.h>
 #include <cute_coroutine.h>
-#include <cute_map.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
-#include <cute_string.h>
-#include <pico_ecs.h>
 #include <stdbool.h>
 
 // =============================================================================
-// ECS Macros
+// Constants
 // =============================================================================
 
-#ifndef ECS_ENTITY_COUNT
-#define ECS_ENTITY_COUNT 4096
-#endif
-
-#define ECS_GET_COMP(COMP)                                                     \
-  cf_map_get(state->world.components, cf_sintern(#COMP))
-
-#define ECS_GET_SYSTEM(SYSTEM)                                                 \
-  cf_map_get(state->world.systems, cf_sintern(#SYSTEM))
-
-#define ECS_REGISTER_COMP(COMP)                                                \
-  do {                                                                         \
-    ecs_comp_t id = ecs_define_component(state->world.ecs, sizeof(COMP),       \
-                                         nullptr, nullptr);                    \
-    cf_map_set(state->world.components, cf_sintern(#COMP), id);                \
-  } while (0)
-
-#define ECS_REGISTER_COMP_CB(COMP, CTOR, DTOR)                                 \
-  do {                                                                         \
-    ecs_comp_t id =                                                            \
-        ecs_define_component(state->world.ecs, sizeof(COMP), CTOR, DTOR);      \
-    cf_map_set(state->world.components, cf_sintern(#COMP), id);                \
-  } while (0)
-
-#define ECS_REGISTER_SYSTEM(SYSTEM, UDATA)                                     \
-  do {                                                                         \
-    ecs_system_t id = ecs_define_system(state->world.ecs, 0, SYSTEM, nullptr,  \
-                                        nullptr, UDATA);                       \
-    cf_map_set(state->world.systems, cf_sintern(#SYSTEM), id);                 \
-  } while (0)
-
-#define ECS_REQUIRE_COMP(SYSTEM, COMP)                                         \
-  ecs_require_component(state->world.ecs, ECS_GET_SYSTEM(SYSTEM),              \
-                        ECS_GET_COMP(COMP))
-
-#define ECS_UPDATE_SYSTEM(SYSTEM, UDATA)                                       \
-  ecs_set_system_callbacks(state->world.ecs, ECS_GET_SYSTEM(SYSTEM), SYSTEM,   \
-                           nullptr, nullptr)
-
-#define ECS_EXCLUDE_COMP(SYSTEM, COMP)                                         \
-  ecs_exclude_component(state->world.ecs, ECS_GET_SYSTEM(SYSTEM),              \
-                        ECS_GET_COMP(COMP))
-
-#define ECS_GET(ENTITY, COMP)                                                  \
-  (COMP*)ecs_get(state->world.ecs, ENTITY, ECS_GET_COMP(COMP))
-
-#define ECS_ADD(ENTITY, COMP)                                                  \
-  (COMP*)ecs_add(state->world.ecs, ENTITY, ECS_GET_COMP(COMP), nullptr)
-
-#define ECS_RUN_SYSTEM(SYSTEM)                                                 \
-  ecs_run_system(state->world.ecs, ECS_GET_SYSTEM(SYSTEM), 0)
-
-// =============================================================================
-// World - ECS context with component/system registries
-// =============================================================================
-
-typedef struct World {
-  ecs_t* ecs;
-  CF_MAP(ecs_comp_t) components;
-  CF_MAP(ecs_system_t) systems;
-  float dt;
-  ecs_entity_t player;
-} World;
+#define MAX_ENTITIES 4096
+#define ENTITY_NONE -1
 
 // =============================================================================
 // Player State Enum
@@ -98,58 +34,85 @@ typedef enum PlayerState {
 } PlayerState;
 
 // =============================================================================
-// ECS Components
+// Entity Components (embedded sub-structs)
 // =============================================================================
 
-// C_PlayerInput - Action-based input component
-// Captures player intentions from keyboard input.
-// Movement actions use held state, action triggers are single-frame.
-typedef struct C_PlayerInput {
-  // Movement directions (held state)
+typedef struct {
+  bool enabled;
   bool up;
   bool down;
   bool left;
   bool right;
-
-  // Movement modifiers (held state)
-  bool crouch; // Crouch/sneak mode
-
-  // Action triggers (single-frame)
+  bool crouch;
   bool shoot;
   bool reload;
-} C_PlayerInput;
+} PlayerInput;
 
-// C_PlayerController - Movement settings
-// Configures player movement speeds and tracks facing direction.
-typedef struct C_PlayerController {
+typedef struct {
+  bool enabled;
   float walk_speed;
-  CF_V2 facing_direction; // Normalized, (1,0) = right
-} C_PlayerController;
+  CF_V2 facing_direction;
+} PlayerController;
 
-// C_PlayerState - Coroutine-based state management
-// Tracks current player state for animation and behavior selection.
-typedef struct C_PlayerState {
+typedef struct {
+  bool enabled;
   PlayerState current;
   CF_Coroutine co;
-} C_PlayerState;
+} PlayerStateComp;
 
-// C_Transform - Position and rotation
-// Stores entity position in world space.
-typedef struct C_Transform {
+typedef struct {
+  bool enabled;
   CF_V2 position;
   float rotation;
-} C_Transform;
+} Transform;
 
-// C_Velocity - Movement vector
-// Stores current velocity for physics integration.
-typedef CF_V2 C_Velocity;
+typedef struct {
+  bool enabled;
+  CF_V2 value;
+} Velocity;
 
-// C_Sprite - Sprite and animation component
-// Holds sprite data for rendering and animation.
-typedef CF_Sprite C_Sprite;
+typedef struct {
+  bool enabled;
+  CF_Sprite sprite;
+} Sprite;
 
 // =============================================================================
-// Function Declarations
+// Entity - Fat struct containing all possible component data
+// =============================================================================
+
+typedef struct Entity {
+  bool exists;
+
+  PlayerInput player_input;
+  PlayerController player_controller;
+  PlayerStateComp player_state;
+  Transform transform;
+  Velocity velocity;
+  Sprite sprite;
+} Entity;
+
+// =============================================================================
+// World
+// =============================================================================
+
+typedef struct World {
+  Entity entities[MAX_ENTITIES];
+  float dt;
+  int player; // index into entities[], ENTITY_NONE if no player
+} World;
+
+// =============================================================================
+// Entity Management
+// =============================================================================
+
+// Find a free slot and mark it as existing. Returns index, or ENTITY_NONE if full.
+int world_add_entity(Entity e);
+
+// Mark entity slot as free.
+void world_remove_entity(int id);
+
+// =============================================================================
+// World Lifecycle
 // =============================================================================
 
 void init_world(void);
@@ -157,4 +120,3 @@ void world_hot_reload(void);
 void update_world(float dt);
 void render_world(void);
 void shutdown_world(void);
-void make_player(void);

@@ -3,24 +3,20 @@
 // Integrates velocity into position using simple Euler integration.
 
 #include <cute_math.h>
-#include <stddef.h>
 
 #include "../../engine/game_state.h"
-#include "systems.h"
-#include "world.h"
+#include "../world.h"
 
-ecs_ret_t sys_apply_velocity([[maybe_unused]] ecs_t* ecs,
-                             ecs_entity_t* entities, size_t count,
-                             [[maybe_unused]] void* udata) {
+void sys_apply_velocity(void) {
   float dt = state->world.dt;
 
-  for (size_t i = 0; i < count; i++) {
-    auto transform = ECS_GET(entities[i], C_Transform);
-    auto velocity  = ECS_GET(entities[i], C_Velocity);
+  for (int i = 0; i < MAX_ENTITIES; i++) {
+    Entity* e = &state->world.entities[i];
+    if (!e->exists) continue;
+    if (!e->transform.enabled) continue;
+    if (!e->velocity.enabled) continue;
 
-    // Simple Euler integration: position += velocity * dt
-    transform->position = cf_add(transform->position, cf_mul(*velocity, dt));
+    e->transform.position =
+        cf_add(e->transform.position, cf_mul(e->velocity.value, dt));
   }
-
-  return 0;
 }

@@ -1,29 +1,18 @@
-// systems.h - Forward declarations for ECS system functions
+// systems.h - System function declarations
 //
-// All system functions follow the pico_ecs signature:
-// ecs_ret_t system(ecs_t* ecs, ecs_entity_t* entities, size_t count, void*
-// udata)
+// Systems iterate world entities directly, filtering by component enabled flags.
 
 #pragma once
 
-#include <stddef.h>
-
-#include "../world.h"
-
-// Input system - reads keyboard/mouse state into C_PlayerInput
-ecs_ret_t sys_gather_input(ecs_t* ecs, ecs_entity_t* entities, size_t count,
-                           void* udata);
+// Input system - reads keyboard/mouse state into PlayerInput
+void sys_gather_input(void);
 
 // Player systems - coroutine-based state and movement
-ecs_ret_t sys_player_coroutine(ecs_t* ecs, ecs_entity_t* entities, size_t count,
-                               void* udata);
-ecs_ret_t sys_update_player_movement(ecs_t* ecs, ecs_entity_t* entities,
-                                     size_t count, void* udata);
+void sys_player_coroutine(void);
+void sys_update_player_movement(void);
 
 // Physics system - Euler integration
-ecs_ret_t sys_apply_velocity(ecs_t* ecs, ecs_entity_t* entities, size_t count,
-                             void* udata);
+void sys_apply_velocity(void);
 
 // Render system - draws sprites at transform positions
-ecs_ret_t sys_render_sprites(ecs_t* ecs, ecs_entity_t* entities, size_t count,
-                             void* udata);
+void sys_render_sprites(void);
