@@ -5,8 +5,12 @@
 #include "ldtk.h"
 
 #include <cute.h>
+#include <cute_alloc.h>
+#include <cute_coroutine.h>
 #include <cute_file_system.h>
 #include <cute_json.h>
+#include <cute_result.h>
+#include <cute_sprite.h>
 #include <cute_string.h>
 #include <stdio.h>
 #include <stdlib.h>
