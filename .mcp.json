@@ -1,12 +1,15 @@
 {
   "mcpServers": {
-    "sdl-mcp": {
-      "command": "uvx",
+    "cf-mcp": {
+      "type": "stdio",
+      "command": "rvx",
       "args": [
-        "--from",
-        "git+https://github.com/jvolden/mcp-sdl",
-        "mcp-sdl"
-      ]
+        "cf-mcp",
+        "stdio",
+        "--root",
+        "/Users/piotr/Work/GitHub/pusewicz/cute_framework/"
+      ],
+      "env": {}
     }
   }
 }
