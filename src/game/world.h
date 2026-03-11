@@ -11,6 +11,8 @@
 #include <cute_sprite.h>
 #include <stdbool.h>
 
+#include "ldtk.h"
+
 // =============================================================================
 // Constants
 // =============================================================================
@@ -99,6 +101,7 @@ typedef struct World {
   Entity entities[MAX_ENTITIES];
   float dt;
   int player; // index into entities[], ENTITY_NONE if no player
+  LdtkMap map;
 } World;
 
 // =============================================================================
@@ -111,6 +114,13 @@ int world_add_entity(Entity e);
 
 // Mark entity slot as free.
 void world_remove_entity(int id);
+
+// =============================================================================
+// Player Factory
+// =============================================================================
+
+// Create a player entity at the given position.
+void make_player_at(float x, float y);
 
 // =============================================================================
 // World Lifecycle

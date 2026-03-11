@@ -10,6 +10,8 @@
 #include <string.h>
 
 #include "../engine/game_state.h"
+#include "../engine/log.h"
+#include "ldtk.h"
 #include "systems/systems.h"
 
 // =============================================================================
@@ -36,7 +38,7 @@ void world_remove_entity(int id) {
 // Player Factory
 // =============================================================================
 
-static void make_player(void) {
+void make_player_at(float x, float y) {
   CF_Sprite player_sprite = cf_make_sprite("assets/sprites/player_combat.ase");
   cf_sprite_play(&player_sprite, "GunWalk");
 
@@ -57,7 +59,7 @@ static void make_player(void) {
       .transform =
           {
               .enabled  = true,
-              .position = cf_v2(0.0f, 0.0f),
+              .position = cf_v2(x, y),
           },
       .velocity = {.enabled = true},
       .sprite =
@@ -77,11 +79,19 @@ static void make_player(void) {
 void init_world(void) {
   memset(&state->world, 0, sizeof(World));
   state->world.player = ENTITY_NONE;
-  make_player();
+
+  if (ldtk_load(&state->world.map, "/assets/ldtk/map/simplified")) {
+    ldtk_spawn_entities(&state->world.map, 0);
+  } else {
+    log_warn("world", "LDtk load failed, spawning player at default position");
+    make_player_at(0.0f, 0.0f);
+  }
 }
 
 void update_world(float dt) {
   state->world.dt = dt;
+
+  ldtk_check_reload(&state->world.map);
 
   sys_gather_input();
   sys_player_coroutine();
@@ -89,7 +99,10 @@ void update_world(float dt) {
   sys_apply_velocity();
 }
 
-void render_world(void) { sys_render_sprites(); }
+void render_world(void) {
+  sys_render_tilemap();
+  sys_render_sprites();
+}
 
 void world_hot_reload(void) {
   int p = state->world.player;
@@ -112,4 +125,6 @@ void shutdown_world(void) {
       cf_destroy_coroutine(e->player_state.co);
     }
   }
+
+  ldtk_unload(&state->world.map);
 }

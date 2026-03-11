@@ -17,3 +17,6 @@ void sys_apply_velocity(void);
 
 // Render system - draws sprites at transform positions
 void sys_render_sprites(void);
+
+// Tilemap render system - draws LDtk pre-rendered layer PNGs
+void sys_render_tilemap(void);
