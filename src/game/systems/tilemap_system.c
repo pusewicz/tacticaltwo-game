@@ -28,8 +28,6 @@ void sys_render_tilemap(void) {
       continue;
     }
     cf_draw_push();
-    // Level offset converted from LDtk Y-down to CF Y-up
-    cf_draw_translate((float)level->x, -(float)level->y);
     cf_draw_sprite(&layer->sprite);
     cf_draw_pop();
   }
