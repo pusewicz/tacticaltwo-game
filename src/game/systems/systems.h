@@ -24,5 +24,8 @@ void sys_collide_tilemap(void);
 // Debug render system - draws collider AABBs and nearby solid tiles
 void sys_debug_colliders(void);
 
+// Debug layer overlay - grid lines, IntGrid cells, entity spawn points, level bounds
+void sys_debug_layers(void);
+
 // Tilemap render system - draws LDtk pre-rendered layer PNGs
 void sys_render_tilemap(void);
