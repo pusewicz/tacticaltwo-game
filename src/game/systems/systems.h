@@ -30,5 +30,8 @@ void sys_debug_layers(void);
 // Camera system - smooth follow with level bounds clamping
 void sys_camera_follow(void);
 
+// Parallax system - tiling background layers with depth-based scrolling
+void sys_render_parallax(void);
+
 // Tilemap render system - draws LDtk pre-rendered layer PNGs
 void sys_render_tilemap(void);

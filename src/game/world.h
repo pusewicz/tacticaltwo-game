@@ -102,6 +102,17 @@ typedef struct Entity {
 } Entity;
 
 // =============================================================================
+// Parallax Background
+// =============================================================================
+
+typedef struct Parallax {
+  CF_Sprite sky;
+  CF_Sprite layer1;
+  CF_Sprite layer2;
+  bool loaded;
+} Parallax;
+
+// =============================================================================
 // World
 // =============================================================================
 
@@ -110,6 +121,7 @@ typedef struct World {
   float dt;
   int player; // index into entities[], ENTITY_NONE if no player
   CF_V2 camera;
+  Parallax parallax;
   LdtkMap map;
 } World;
 

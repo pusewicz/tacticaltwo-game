@@ -6,6 +6,7 @@
 
 #include <cute_coroutine.h>
 #include <cute_math.h>
+#include <cute_result.h>
 #include <cute_sprite.h>
 #include <string.h>
 
@@ -94,6 +95,34 @@ void init_world(void) {
     make_player_at(0.0f, 0.0f);
   }
 
+  // Load parallax backgrounds
+  {
+    Parallax* px    = &state->world.parallax;
+    CF_Result result = {0};
+
+    px->sky = cf_make_easy_sprite_from_png(
+        "/assets/GandalfHardcore City Tiles/City background sky.png", &result);
+    if (cf_is_error(result)) {
+      log_warn("world", "Failed to load parallax sky");
+    }
+
+    px->layer1 = cf_make_easy_sprite_from_png(
+        "/assets/GandalfHardcore City Tiles/City background layer1.png",
+        &result);
+    if (cf_is_error(result)) {
+      log_warn("world", "Failed to load parallax layer1");
+    }
+
+    px->layer2 = cf_make_easy_sprite_from_png(
+        "/assets/GandalfHardcore City Tiles/City background layer2.png",
+        &result);
+    if (cf_is_error(result)) {
+      log_warn("world", "Failed to load parallax layer2");
+    }
+
+    px->loaded = !cf_is_error(result);
+  }
+
   // Snap camera to player spawn (no lerp on first frame)
   int p = state->world.player;
   if (p != ENTITY_NONE) {
@@ -119,6 +148,8 @@ void update_world(float dt) {
 }
 
 void render_world(void) {
+  sys_render_parallax();
+
   cf_draw_push();
   cf_draw_translate(-state->world.camera.x, -state->world.camera.y);
 
@@ -153,6 +184,13 @@ void shutdown_world(void) {
     if (e->exists && e->player_state.enabled && e->player_state.co.id != 0) {
       cf_destroy_coroutine(e->player_state.co);
     }
+  }
+
+  // Unload parallax sprites
+  if (state->world.parallax.loaded) {
+    cf_easy_sprite_unload(&state->world.parallax.sky);
+    cf_easy_sprite_unload(&state->world.parallax.layer1);
+    cf_easy_sprite_unload(&state->world.parallax.layer2);
   }
 
   ldtk_unload(&state->world.map);
