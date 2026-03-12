@@ -4,6 +4,7 @@
 
 #include <cute_math.h>
 
+#include "../../config/config.h"
 #include "../../engine/game_state.h"
 #include "../world.h"
 #include "systems.h"
@@ -30,7 +31,6 @@ void sys_update_player_movement(void) {
     if (e->player_state.current == PLAYER_STATE_CROUCHING ||
         e->player_state.current == PLAYER_STATE_CROUCH_FIRING) {
       e->velocity.value.x = 0.0f;
-      e->velocity.value.y = 0.0f;
     } else {
       e->velocity.value.x = 0.0f;
       if (e->player_input.left) {
@@ -39,7 +39,8 @@ void sys_update_player_movement(void) {
       if (e->player_input.right) {
         e->velocity.value.x += e->player_controller.walk_speed;
       }
-      e->velocity.value.y = 0.0f;
     }
+
+    e->velocity.value.y += GRAVITY * state->world.dt;
   }
 }

@@ -18,5 +18,11 @@ void sys_apply_velocity(void);
 // Render system - draws sprites at transform positions
 void sys_render_sprites(void);
 
+// Collision system - resolves entity-tilemap overlaps
+void sys_collide_tilemap(void);
+
+// Debug render system - draws collider AABBs and nearby solid tiles
+void sys_debug_colliders(void);
+
 // Tilemap render system - draws LDtk pre-rendered layer PNGs
 void sys_render_tilemap(void);

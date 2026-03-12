@@ -21,7 +21,6 @@
 #include "world.h"
 
 #define LDTK_TAG "ldtk"
-#define LDTK_GRID_SIZE 16
 #define LDTK_RELOAD_INTERVAL 30
 
 // =============================================================================
@@ -52,7 +51,10 @@ static bool parse_csv(const char* virtual_path, int** out_grid, int* out_width,
       current_cols++;
     } else if (data[i] == '\n') {
       if (current_cols > 0 || (i > 0 && data[i - 1] != '\n')) {
-        current_cols++; // last value before newline
+        // Only count the last value if line doesn't end with trailing comma
+        if (i == 0 || data[i - 1] != ',') {
+          current_cols++;
+        }
         if (cols == 0) {
           cols = current_cols;
         }

@@ -17,6 +17,7 @@
 #define LDTK_MAX_LAYERS 8
 #define LDTK_MAX_ENTITIES 64
 #define LDTK_MAX_PATH 256
+#define LDTK_GRID_SIZE 16
 
 // =============================================================================
 // Data Structures

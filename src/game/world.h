@@ -75,6 +75,13 @@ typedef struct {
 
 typedef struct {
   bool enabled;
+  CF_V2 half_size; // AABB half-extents from center
+  CF_V2 offset;    // offset from transform position to collider center
+  bool grounded;   // true when standing on solid tile
+} Collider;
+
+typedef struct {
+  bool enabled;
   CF_Sprite sprite;
 } Sprite;
 
@@ -90,6 +97,7 @@ typedef struct Entity {
   PlayerStateComp player_state;
   Transform transform;
   Velocity velocity;
+  Collider collider;
   Sprite sprite;
 } Entity;
 

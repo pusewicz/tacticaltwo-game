@@ -62,6 +62,13 @@ void make_player_at(float x, float y) {
               .position = cf_v2(x, y),
           },
       .velocity = {.enabled = true},
+      .collider =
+          {
+              .enabled   = true,
+              .half_size = cf_v2(7.0f, 14.0f),
+              .offset    = cf_v2(0.0f, -28.0f),
+              .grounded  = false,
+          },
       .sprite =
           {
               .enabled = true,
@@ -89,6 +96,10 @@ void init_world(void) {
 }
 
 void update_world(float dt) {
+  // Clamp dt to prevent physics explosion on first frame or lag spikes
+  if (dt > 1.0f / 20.0f) {
+    dt = 1.0f / 20.0f;
+  }
   state->world.dt = dt;
 
   ldtk_check_reload(&state->world.map);
@@ -97,11 +108,16 @@ void update_world(float dt) {
   sys_player_coroutine();
   sys_update_player_movement();
   sys_apply_velocity();
+  sys_collide_tilemap();
 }
 
 void render_world(void) {
   sys_render_tilemap();
   sys_render_sprites();
+
+  if (state->debug_mode) {
+    sys_debug_colliders();
+  }
 }
 
 void world_hot_reload(void) {

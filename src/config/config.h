@@ -9,4 +9,6 @@
 #define CANVAS_HEIGHT 405
 #define CANVAS_SCALE 2
 
+#define GRAVITY -500.0f // pixels/sec^2 (Y-up, so negative = downward)
+
 #endif

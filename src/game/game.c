@@ -67,6 +67,40 @@ bool game_update(void) {
 
   update_world(CF_DELTA_TIME);
 
+  if (state->debug_mode) {
+    ImGui_Begin("Debug", &state->debug_mode, 0);
+
+    int p = state->world.player;
+    if (p != ENTITY_NONE) {
+      Entity* player = &state->world.entities[p];
+
+      ImGui_SeparatorText("Collider");
+      ImGui_SliderFloat("half_w", &player->collider.half_size.x, 1.0f, 32.0f);
+      ImGui_SliderFloat("half_h", &player->collider.half_size.y, 1.0f, 48.0f);
+      ImGui_SliderFloat("offset_x", &player->collider.offset.x, -48.0f, 48.0f);
+      ImGui_SliderFloat("offset_y", &player->collider.offset.y, -48.0f, 48.0f);
+      ImGui_Text("grounded: %s", player->collider.grounded ? "true" : "false");
+
+      ImGui_SeparatorText("Transform");
+      ImGui_Text("pos: %.1f, %.1f", (double)player->transform.position.x,
+                 (double)player->transform.position.y);
+      ImGui_Text("vel: %.1f, %.1f", (double)player->velocity.value.x,
+                 (double)player->velocity.value.y);
+    }
+
+    LdtkMap* map = &state->world.map;
+    if (map->loaded) {
+      LdtkLevel* lvl = &map->levels[map->active_level];
+      ImGui_SeparatorText("Level");
+      ImGui_Text("name: %s", lvl->identifier);
+      ImGui_Text("pos: %d, %d  size: %dx%d", lvl->x, lvl->y, lvl->width,
+                 lvl->height);
+      ImGui_Text("grid: %dx%d", lvl->grid_width, lvl->grid_height);
+    }
+
+    ImGui_End();
+  }
+
   return true;
 }
 
