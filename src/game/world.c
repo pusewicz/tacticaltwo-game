@@ -128,6 +128,8 @@ void init_world(void) {
   if (p != ENTITY_NONE) {
     state->world.camera = state->world.entities[p].transform.position;
   }
+
+  sys_rain_init();
 }
 
 void update_world(float dt) {
@@ -178,6 +180,8 @@ void world_hot_reload(void) {
 }
 
 void shutdown_world(void) {
+  sys_rain_shutdown();
+
   // Destroy any active coroutines
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];

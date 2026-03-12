@@ -35,3 +35,7 @@ void sys_render_parallax(void);
 
 // Tilemap render system - draws LDtk pre-rendered layer PNGs
 void sys_render_tilemap(void);
+
+// Rain audio system - procedural white noise with low-pass filter
+void sys_rain_init(void);
+void sys_rain_shutdown(void);

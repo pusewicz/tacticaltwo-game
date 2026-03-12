@@ -12,6 +12,7 @@ add_library(${NAME} SHARED
   systems/tilemap_system.c
   systems/camera_system.c
   systems/parallax_system.c
+  systems/rain_system.c
   ../engine/asset.c
   ../engine/log.c
 )
