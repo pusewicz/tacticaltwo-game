@@ -109,6 +109,7 @@ typedef struct World {
   Entity entities[MAX_ENTITIES];
   float dt;
   int player; // index into entities[], ENTITY_NONE if no player
+  CF_V2 camera;
   LdtkMap map;
 } World;
 

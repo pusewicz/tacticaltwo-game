@@ -27,5 +27,8 @@ void sys_debug_colliders(void);
 // Debug layer overlay - grid lines, IntGrid cells, entity spawn points, level bounds
 void sys_debug_layers(void);
 
+// Camera system - smooth follow with level bounds clamping
+void sys_camera_follow(void);
+
 // Tilemap render system - draws LDtk pre-rendered layer PNGs
 void sys_render_tilemap(void);

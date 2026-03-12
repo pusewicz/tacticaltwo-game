@@ -10,6 +10,7 @@ add_library(${NAME} SHARED
   systems/animation_system.c
   systems/render_system.c
   systems/tilemap_system.c
+  systems/camera_system.c
   ../engine/asset.c
   ../engine/log.c
 )

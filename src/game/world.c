@@ -93,6 +93,12 @@ void init_world(void) {
     log_warn("world", "LDtk load failed, spawning player at default position");
     make_player_at(0.0f, 0.0f);
   }
+
+  // Snap camera to player spawn (no lerp on first frame)
+  int p = state->world.player;
+  if (p != ENTITY_NONE) {
+    state->world.camera = state->world.entities[p].transform.position;
+  }
 }
 
 void update_world(float dt) {
@@ -109,9 +115,13 @@ void update_world(float dt) {
   sys_update_player_movement();
   sys_apply_velocity();
   sys_collide_tilemap();
+  sys_camera_follow();
 }
 
 void render_world(void) {
+  cf_draw_push();
+  cf_draw_translate(-state->world.camera.x, -state->world.camera.y);
+
   sys_render_tilemap();
   sys_render_sprites();
 
@@ -119,6 +129,8 @@ void render_world(void) {
     sys_debug_layers();
     sys_debug_colliders();
   }
+
+  cf_draw_pop();
 }
 
 void world_hot_reload(void) {
