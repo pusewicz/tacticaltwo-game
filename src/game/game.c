@@ -16,6 +16,7 @@
 #include "../config/config.h"
 #include "../engine/game_state.h"
 #include "../engine/platform.h"
+#include "ldtk.h"
 #include "world.h"
 
 GameState* state = nullptr;
