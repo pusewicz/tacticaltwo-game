@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cute.h>
+#include <cute_audio.h>
 #include <cute_coroutine.h>
 #include <cute_math.h>
 #include <cute_sprite.h>
@@ -113,6 +114,16 @@ typedef struct Parallax {
 } Parallax;
 
 // =============================================================================
+// Rain Audio
+// =============================================================================
+
+typedef struct Rain {
+  CF_Audio audio;
+  CF_Sound sound;
+  bool playing;
+} Rain;
+
+// =============================================================================
 // World
 // =============================================================================
 
@@ -123,6 +134,7 @@ typedef struct World {
   CF_V2 camera;
   Parallax parallax;
   LdtkMap map;
+  Rain rain;
 } World;
 
 // =============================================================================
