@@ -25,7 +25,7 @@ task build: "cmake:build"
 desc "Run the game"
 task :run do
   sh "ninja -C build/relwithdebinfo"
-  exec "build/relwithdebinfo/bin/TacticalTwo.app/Contents/MacOS/TacticalTwo"
+  exec "build/relwithdebinfo/bin/TacticalTwo"
 end
 
 desc "Format C source files"

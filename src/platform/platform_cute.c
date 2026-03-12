@@ -23,12 +23,9 @@
 
 #define MAX_PATH_LENGTH 1024
 
-static char game_library_path[MAX_PATH_LENGTH] = {0};
 static SDL_PathInfo path_info;
-
-#ifdef SDL_PLATFORM_WIN32
-static char game_library_copy_path[MAX_PATH_LENGTH] = {0};
-#endif
+static int load_counter = 0;
+static char game_library_load_path[MAX_PATH_LENGTH] = {0};
 
 void platform_init(int argc [[maybe_unused]], char* argv[]) {
   log_init();
@@ -83,44 +80,23 @@ int platform_get_page_size(void) {
 GameLibrary platform_load_game_library(void) {
   GameLibrary game_library = {0};
 
-  const char* base_path = SDL_GetBasePath();
-  if (!base_path) {
-    log_error("platform", "Failed to get base path: %s", SDL_GetError());
-    return game_library;
-  }
+  game_library.path = GAME_LIB_PATH;
 
-  const char* game_library_name =
-      GAME_LIB_PREFIX GAME_LIB_BASENAME GAME_LIB_SUFFIX;
-#ifdef SDL_PLATFORM_WIN32
-  const char* game_library_copy_name =
-      GAME_LIB_PREFIX GAME_LIB_BASENAME "_copy" GAME_LIB_SUFFIX;
-  SDL_snprintf(game_library_copy_path, CF_ARRAY_SIZE(game_library_copy_path),
-               "%s%s", base_path, game_library_copy_name);
-#endif
-
-  SDL_snprintf(game_library_path, CF_ARRAY_SIZE(game_library_path), "%s%s",
-               base_path, game_library_name);
-
-  if (!SDL_GetPathInfo(game_library_path, &path_info)) {
-    log_error("platform", "Failed to get path info (%s): %s", game_library_path,
+  if (!SDL_GetPathInfo(game_library.path, &path_info)) {
+    log_error("platform", "Failed to get path info (%s): %s", game_library.path,
               SDL_GetError());
     return game_library;
   }
 
-#ifdef SDL_PLATFORM_WIN32
-  if (!SDL_CopyFile(game_library_path, game_library_copy_path)) {
+  // Copy to a unique path each time to bypass macOS dyld caching
+  SDL_snprintf(game_library_load_path, sizeof(game_library_load_path),
+               GAME_LIB_PATH ".%d", load_counter++);
+  if (!SDL_CopyFile(GAME_LIB_PATH, game_library_load_path)) {
     log_error("platform", "Failed to copy library: %s", SDL_GetError());
     return game_library;
   }
-#endif
 
-#ifdef SDL_PLATFORM_WIN32
-  game_library.path = game_library_copy_path;
-#else
-  game_library.path = game_library_path;
-#endif
-
-  game_library.library = cf_load_shared_library(game_library.path);
+  game_library.library = cf_load_shared_library(game_library_load_path);
   if (!game_library.library) {
     log_error("platform", "Failed to load library: %s", SDL_GetError());
     return game_library;
@@ -178,6 +154,10 @@ void platform_end_frame(void) { cf_app_draw_onto_screen(true); }
 
 void platform_unload_game_library(GameLibrary* game_library) {
   cf_unload_shared_library(game_library->library);
+  // Clean up the old copy after unloading
+  if (game_library_load_path[0] != '\0') {
+    SDL_RemovePath(game_library_load_path);
+  }
   game_library->hot_reload = nullptr;
   game_library->state      = nullptr;
   game_library->shutdown   = nullptr;

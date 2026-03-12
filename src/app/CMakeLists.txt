@@ -1,6 +1,6 @@
 set(NAME "TacticalTwo")
 
-add_executable(${NAME} WIN32 MACOSX_BUNDLE
+add_executable(${NAME} WIN32
   main.c
   ../engine/log.c
   ../platform/platform_cute.c
@@ -12,9 +12,7 @@ target_link_libraries(${NAME} PRIVATE config cute)
 if(ENABLE_HOT_RELOADING)
   target_compile_definitions(${NAME} PRIVATE ENGINE_HOT_RELOADING)
   target_compile_definitions(${NAME} PRIVATE
-    GAME_LIB_BASENAME="game"
-    GAME_LIB_PREFIX="${CMAKE_SHARED_LIBRARY_PREFIX}"
-    GAME_LIB_SUFFIX="${CMAKE_SHARED_LIBRARY_SUFFIX}"
+    GAME_LIB_PATH="$<TARGET_FILE:game>"
     ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets" # Pass source assets path for development (CF fs doesn't follow symlinks)
   )
 else()
