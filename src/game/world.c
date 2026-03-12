@@ -116,6 +116,7 @@ void render_world(void) {
   sys_render_sprites();
 
   if (state->debug_mode) {
+    sys_debug_layers();
     sys_debug_colliders();
   }
 }
