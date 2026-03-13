@@ -18,7 +18,6 @@
 #include "../engine/log.h"
 #include "../engine/platform.h"
 #include "ldtk.h"
-#include "night.h"
 #include "rain.h"
 #include "world.h"
 
@@ -27,11 +26,6 @@ GameState* state = nullptr;
 // Handles hot-reload for all game shaders (overrides rain.c's callback)
 static void on_shader_changed(const char* path,
                                [[maybe_unused]] void* udata) {
-  if (state->world.night.initialized) {
-    if (cf_shader_reload(&state->world.night.shader)) {
-      log_info("game", "Night shader reloaded: %s", path);
-    }
-  }
   if (state->world.rain.initialized) {
     cf_shader_reload(&state->world.rain.shader);
   }
@@ -73,8 +67,6 @@ void game_init(Platform* platform) {
   cf_shader_directory("/assets/shaders");
 
   init_world();
-  night_init();
-
   // Global shader hot-reload callback (supersedes rain.c's callback)
   cf_shader_on_changed(on_shader_changed, nullptr);
 
@@ -135,10 +127,6 @@ bool game_update(void) {
     ImGui_SliderFloat("splash speed", &state->world.rain.splash_speed, 2.0f, 60.0f);
     ImGui_SliderFloat("gravity", &state->world.rain.splash_gravity, 5.0f, 80.0f);
 
-    ImGui_SeparatorText("Night");
-    ImGui_SliderFloat("night intensity", &state->world.night.intensity, 0.0f, 1.0f);
-    ImGui_SliderFloat("desaturation", &state->world.night.desaturation, 0.0f, 1.0f);
-    ImGui_ColorEdit3("night tint", state->world.night.tint, 0);
 
     ImGui_End();
   }
@@ -173,9 +161,7 @@ void game_render(void) {
                                      cf_v2((float)window_w, (float)window_h));
     cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
 
-    night_push();
     cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
-    night_pop();
 
     // Restore projection for the next frame
     cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
@@ -186,7 +172,6 @@ void game_render(void) {
 
 void game_shutdown(void) {
   shutdown_world();
-  night_shutdown();
   cf_destroy_canvas(state->canvas);
   cf_destroy_arena(state->scratch_arena);
   free(state->scratch_arena);
