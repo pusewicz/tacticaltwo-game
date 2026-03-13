@@ -11,11 +11,4 @@
 
 #define GRAVITY -500.0f // pixels/sec^2 (Y-up, so negative = downward)
 
-// Night shader defaults
-#define NIGHT_INTENSITY 0.7f
-#define NIGHT_DESATURATION 0.5f
-#define NIGHT_TINT_R 0.3f
-#define NIGHT_TINT_G 0.35f
-#define NIGHT_TINT_B 0.6f
-
 #endif

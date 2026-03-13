@@ -29,13 +29,39 @@ typedef struct LdtkLayerImage {
   bool loaded;
 } LdtkLayerImage;
 
+#define LDTK_MAX_CUSTOM_FIELDS 8
+#define LDTK_CUSTOM_FIELD_MAX_STR 32
+
+typedef enum LdtkFieldType {
+  LDTK_FIELD_NONE,
+  LDTK_FIELD_INT,
+  LDTK_FIELD_FLOAT,
+  LDTK_FIELD_STRING,
+} LdtkFieldType;
+
+typedef struct LdtkCustomField {
+  const char* key;
+  LdtkFieldType type;
+  union {
+    int i;
+    float f;
+    char s[LDTK_CUSTOM_FIELD_MAX_STR];
+  } value;
+} LdtkCustomField;
+
 typedef struct LdtkEntityInstance {
   const char* identifier;
   int x;
   int y;
   int width;
   int height;
+  LdtkCustomField custom_fields[LDTK_MAX_CUSTOM_FIELDS];
+  int custom_field_count;
 } LdtkEntityInstance;
+
+// Look up a custom field by key. Returns nullptr if not found.
+const LdtkCustomField* ldtk_entity_get_field(const LdtkEntityInstance* e,
+                                              const char* key);
 
 typedef struct LdtkLevel {
   const char* identifier;

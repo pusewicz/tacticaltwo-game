@@ -127,7 +127,7 @@ void rain_init(void) {
   rain->splash_speed     = 20.0f;
   rain->splash_gravity   = 20.0f;
   rain->initialized = true;
-  rain->enabled     = true;
+  rain->enabled     = false;
 
   log_info("rain", "Rain system initialized (intensity=%.1f)",
            (double)rain->intensity);

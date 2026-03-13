@@ -25,6 +25,25 @@
 				"color": 12470831,
 				"customFields" : {}
 			}
+		],
+		"Light": [
+			{
+				"id": "Light",
+				"iid": "46ea3de0-fa90-11f0-85fe-454dafd8b5fc",
+				"layer": "Entities",
+				"x": 392,
+				"y": 168,
+				"width": 16,
+				"height": 16,
+				"color": 16448483,
+				"customFields": {
+					"Color": "#FAFBE3",
+					"Intensity": 1,
+					"Radius": 80,
+					"Direction": 270,
+					"ConeAngle": 80
+				}
+			}
 		]
 	}
 }

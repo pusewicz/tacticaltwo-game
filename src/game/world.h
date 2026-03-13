@@ -12,7 +12,7 @@
 #include <stdbool.h>
 
 #include "ldtk.h"
-#include "night.h"
+#include "lighting.h"
 #include "rain.h"
 
 // =============================================================================
@@ -126,6 +126,10 @@ typedef struct World {
   Parallax parallax;
   LdtkMap map;
   RainState rain;
+  LightingState lighting;
+  // Static lights loaded from LDtk "Light" entities on level load.
+  Light lights_static[LIGHTING_MAX_LIGHTS];
+  int lights_static_count;
 } World;
 
 // =============================================================================

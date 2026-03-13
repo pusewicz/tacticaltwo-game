@@ -6,6 +6,7 @@
 
 #include <cute.h>
 #include <cute_alloc.h>
+#include <cute_color.h>
 #include <cute_coroutine.h>
 #include <cute_file_system.h>
 #include <cute_json.h>
@@ -22,6 +23,20 @@
 
 #define LDTK_TAG "ldtk"
 #define LDTK_RELOAD_INTERVAL 30
+
+// =============================================================================
+// Field lookup
+// =============================================================================
+
+const LdtkCustomField* ldtk_entity_get_field(const LdtkEntityInstance* e,
+                                              const char* key) {
+  for (int i = 0; i < e->custom_field_count; i++) {
+    if (strcmp(e->custom_fields[i].key, key) == 0) {
+      return &e->custom_fields[i];
+    }
+  }
+  return nullptr;
+}
 
 // =============================================================================
 // Internal Helpers
@@ -182,6 +197,35 @@ static bool parse_level_data(LdtkMap* map, const char* level_dir,
         e->y                  = cf_json_get_int(cf_json_get(inst, "y"));
         e->width              = cf_json_get_int(cf_json_get(inst, "width"));
         e->height             = cf_json_get_int(cf_json_get(inst, "height"));
+        e->custom_field_count = 0;
+
+        CF_JVal cfields = cf_json_get(inst, "customFields");
+        if (cf_json_is_object(cfields)) {
+          for (CF_JIter fit = cf_json_iter(cfields);
+               !cf_json_iter_done(fit);
+               fit = cf_json_iter_next(fit)) {
+            if (e->custom_field_count >= LDTK_MAX_CUSTOM_FIELDS) {
+              break;
+            }
+            LdtkCustomField* f = &e->custom_fields[e->custom_field_count];
+            f->key  = cf_sintern(cf_json_iter_key(fit));
+            f->type = LDTK_FIELD_NONE;
+            CF_JVal fval = cf_json_iter_val(fit);
+            if (cf_json_is_int(fval)) {
+              f->type    = LDTK_FIELD_INT;
+              f->value.i = cf_json_get_int(fval);
+            } else if (cf_json_is_float(fval)) {
+              f->type    = LDTK_FIELD_FLOAT;
+              f->value.f = cf_json_get_float(fval);
+            } else if (cf_json_is_string(fval)) {
+              f->type = LDTK_FIELD_STRING;
+              snprintf(f->value.s, sizeof(f->value.s), "%s",
+                       cf_json_get_string(fval));
+            }
+            e->custom_field_count++;
+          }
+        }
+
         level->entity_count++;
       }
     }
@@ -215,6 +259,35 @@ static bool parse_level_data(LdtkMap* map, const char* level_dir,
   return true;
 }
 
+// Compute the newest mtime across all files in a level directory
+// (data.json, layer PNGs, Floor.csv).
+static uint64_t level_newest_mtime(const char* level_dir,
+                                   const LdtkLevel* level) {
+  uint64_t newest = 0;
+
+  char path[LDTK_MAX_PATH];
+  CF_Stat s;
+
+  build_path(path, sizeof(path), level_dir, "data.json");
+  if (!cf_is_error(cf_fs_stat(path, &s)) && s.last_modified_time > newest) {
+    newest = s.last_modified_time;
+  }
+
+  for (int i = 0; i < level->layer_count; i++) {
+    build_path(path, sizeof(path), level_dir, level->layers[i].identifier);
+    if (!cf_is_error(cf_fs_stat(path, &s)) && s.last_modified_time > newest) {
+      newest = s.last_modified_time;
+    }
+  }
+
+  build_path(path, sizeof(path), level_dir, "Floor.csv");
+  if (!cf_is_error(cf_fs_stat(path, &s)) && s.last_modified_time > newest) {
+    newest = s.last_modified_time;
+  }
+
+  return newest;
+}
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -244,11 +317,6 @@ bool ldtk_load(LdtkMap* map, const char* simplified_base_path) {
       continue;
     }
 
-    // Record modification time from first level for hot-reload detection
-    if (map->level_count == 0) {
-      map->last_modified_time = file_stat.last_modified_time;
-    }
-
     map->level_count++;
   }
 
@@ -256,6 +324,13 @@ bool ldtk_load(LdtkMap* map, const char* simplified_base_path) {
     log_error(LDTK_TAG, "No levels found at %s", simplified_base_path);
     return false;
   }
+
+  // Record newest mtime across all files for hot-reload detection.
+  char level0_dir[LDTK_MAX_PATH];
+  snprintf(level0_dir, sizeof(level0_dir), "%s/Level_0", simplified_base_path);
+  map->last_modified_time = level_newest_mtime(level0_dir, &map->levels[0]);
+  log_debug(LDTK_TAG, "Baseline newest mtime=%llu",
+            (unsigned long long)map->last_modified_time);
 
   map->active_level   = 0;
   map->loaded         = true;
@@ -298,17 +373,12 @@ bool ldtk_check_reload(LdtkMap* map) {
   }
   map->reload_counter = 0;
 
-  char data_path[LDTK_MAX_PATH];
-  snprintf(data_path, sizeof(data_path), "%s/Level_0/data.json",
-           map->base_path);
+  // Check newest mtime across all level files (data.json, PNGs, CSVs).
+  char level0_dir[LDTK_MAX_PATH];
+  snprintf(level0_dir, sizeof(level0_dir), "%s/Level_0", map->base_path);
+  uint64_t newest = level_newest_mtime(level0_dir, &map->levels[0]);
 
-  CF_Stat file_stat;
-  CF_Result result = cf_fs_stat(data_path, &file_stat);
-  if (cf_is_error(result)) {
-    return false;
-  }
-
-  if (file_stat.last_modified_time <= map->last_modified_time) {
+  if (newest <= map->last_modified_time) {
     return false;
   }
 
@@ -342,6 +412,9 @@ void ldtk_spawn_entities(LdtkMap* map, int level_index) {
     return;
   }
 
+  // Reset static lights before repopulating (handles level reload).
+  state->world.lights_static_count = 0;
+
   LdtkLevel* level = &map->levels[level_index];
 
   for (int i = 0; i < level->entity_count; i++) {
@@ -355,6 +428,84 @@ void ldtk_spawn_entities(LdtkMap* map, int level_index) {
       make_player_at(cf_x, cf_y);
       log_info(LDTK_TAG, "Spawned Player at LDtk(%d, %d) -> CF(%.0f, %.0f)",
                ent->x, ent->y, (double)cf_x, (double)cf_y);
+    } else if (strcmp(ent->identifier, "Light") == 0) {
+      // Convert LDtk coords (Y-down) to CF world coords (Y-up).
+      float cf_x = (float)ent->x - (float)level->width / 2.0f;
+      float cf_y = (float)level->height / 2.0f - (float)ent->y;
+
+      // Read Color, Intensity, Radius from customFields (with defaults).
+      float r = 1.0f, g = 0.85f, b = 0.5f;
+      float intensity = 1.0f;
+      float radius    = 80.0f;
+
+      const LdtkCustomField* f_color = ldtk_entity_get_field(ent, "Color");
+      if (f_color && f_color->type == LDTK_FIELD_STRING) {
+        CF_Color c = cf_make_color_hex_string(f_color->value.s);
+        r = c.r;
+        g = c.g;
+        b = c.b;
+      }
+      const LdtkCustomField* f_intensity =
+          ldtk_entity_get_field(ent, "Intensity");
+      if (f_intensity) {
+        if (f_intensity->type == LDTK_FIELD_FLOAT) {
+          intensity = f_intensity->value.f;
+        } else if (f_intensity->type == LDTK_FIELD_INT) {
+          intensity = (float)f_intensity->value.i;
+        }
+      }
+      // Radius in LDtk is in tile units; convert to game pixels.
+      const LdtkCustomField* f_radius = ldtk_entity_get_field(ent, "Radius");
+      if (f_radius) {
+        if (f_radius->type == LDTK_FIELD_FLOAT) {
+          radius = f_radius->value.f * LDTK_GRID_SIZE;
+        } else if (f_radius->type == LDTK_FIELD_INT) {
+          radius = (float)(f_radius->value.i * LDTK_GRID_SIZE);
+        }
+      }
+
+      // Direction (degrees, 0=right, 270=down) and ConeAngle (full spread).
+      float direction = 270.0f;  // default: pointing down (street light)
+      float cone      = 360.0f;  // default: omnidirectional
+      const LdtkCustomField* f_dir = ldtk_entity_get_field(ent, "Direction");
+      if (f_dir) {
+        if (f_dir->type == LDTK_FIELD_FLOAT) {
+          direction = f_dir->value.f;
+        } else if (f_dir->type == LDTK_FIELD_INT) {
+          direction = (float)f_dir->value.i;
+        }
+      }
+      const LdtkCustomField* f_cone = ldtk_entity_get_field(ent, "ConeAngle");
+      if (f_cone) {
+        if (f_cone->type == LDTK_FIELD_FLOAT) {
+          cone = f_cone->value.f;
+        } else if (f_cone->type == LDTK_FIELD_INT) {
+          cone = (float)f_cone->value.i;
+        }
+      }
+
+      int n = state->world.lights_static_count;
+      if (n < LIGHTING_MAX_LIGHTS) {
+        state->world.lights_static[n] = (Light){
+          .x         = cf_x,
+          .y         = cf_y,
+          .r         = r,
+          .g         = g,
+          .b         = b,
+          .intensity = intensity,
+          .radius    = radius,
+          .direction = direction,
+          .cone      = cone,
+        };
+        state->world.lights_static_count++;
+        log_info(LDTK_TAG,
+                 "Spawned Light at LDtk(%d, %d) -> CF(%.0f, %.0f) "
+                 "color=(%.2f,%.2f,%.2f) intensity=%.1f radius=%.1f "
+                 "dir=%.0f cone=%.0f",
+                 ent->x, ent->y, (double)cf_x, (double)cf_y, (double)r,
+                 (double)g, (double)b, (double)intensity, (double)radius,
+                 (double)direction, (double)cone);
+      }
     }
   }
 }

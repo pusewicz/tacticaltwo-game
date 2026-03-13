@@ -18,13 +18,14 @@
 #include "../engine/log.h"
 #include "../engine/platform.h"
 #include "ldtk.h"
+#include "lighting.h"
 #include "rain.h"
 #include "world.h"
 
 GameState* state = nullptr;
 
 // Handles hot-reload for all game shaders (overrides rain.c's callback)
-static void on_shader_changed(const char* path,
+static void on_shader_changed([[maybe_unused]] const char* path,
                                [[maybe_unused]] void* udata) {
   if (state->world.rain.initialized) {
     cf_shader_reload(&state->world.rain.shader);
@@ -114,6 +115,7 @@ bool game_update(void) {
     }
 
     ImGui_SeparatorText("Rain");
+    ImGui_Checkbox("rain enabled", &state->world.rain.enabled);
     ImGui_SliderFloat("intensity", &state->world.rain.intensity, 0.0f, 3.0f);
     ImGui_SliderFloat("density", &state->world.rain.density, 0.0f, 3.0f);
     ImGui_SliderFloat("alpha", &state->world.rain.alpha, 0.0f, 1.0f);
@@ -127,6 +129,45 @@ bool game_update(void) {
     ImGui_SliderFloat("splash speed", &state->world.rain.splash_speed, 2.0f, 60.0f);
     ImGui_SliderFloat("gravity", &state->world.rain.splash_gravity, 5.0f, 80.0f);
 
+    ImGui_SeparatorText("Lighting (HRC)");
+    LightingState* lt = &state->world.lighting;
+    ImGui_SliderFloat("ambient", &lt->ambient, 0.0f, 1.0f);
+    // Grid size selector (64, 128, 256, 512).
+    int grid_sizes[] = {64, 128, 256, 512};
+    int grid_idx = 0;
+    for (int i = 0; i < 4; i++) {
+      if (lt->grid == grid_sizes[i]) { grid_idx = i; break; }
+    }
+    if (ImGui_Combo("grid", &grid_idx, "64\000128\000256\000512\000\000")) {
+      lighting_set_grid(lt, grid_sizes[grid_idx]);
+    }
+    ImGui_SliderInt("debug_mode", &lt->debug_mode, 0, 7);
+    ImGui_Checkbox("cminus1", (bool*)&lt->cminus1);
+    ImGui_SliderInt("trace_levels", &lt->trace_levels, 0, lt->n + 1);
+
+    // Per-light controls for static lights from LDtk.
+    for (int i = 0; i < state->world.lights_static_count; i++) {
+      Light* l = &state->world.lights_static[i];
+      ImGui_PushIDInt(i);
+      char label[32];
+      snprintf(label, sizeof(label), "Light %d", i);
+      if (ImGui_TreeNode(label)) {
+        ImGui_SliderFloat("x", &l->x, -400.0f, 400.0f);
+        ImGui_SliderFloat("y", &l->y, -200.0f, 200.0f);
+        float color[3] = {l->r, l->g, l->b};
+        if (ImGui_ColorEdit3("color", color, 0)) {
+          l->r = color[0];
+          l->g = color[1];
+          l->b = color[2];
+        }
+        ImGui_SliderFloat("intensity", &l->intensity, 0.0f, 10.0f);
+        ImGui_SliderFloat("radius", &l->radius, 1.0f, 200.0f);
+        ImGui_SliderFloat("direction", &l->direction, 0.0f, 360.0f);
+        ImGui_SliderFloat("cone", &l->cone, 10.0f, 360.0f);
+        ImGui_TreePop();
+      }
+      ImGui_PopID();
+    }
 
     ImGui_End();
   }
@@ -137,24 +178,40 @@ bool game_update(void) {
 void game_render(void) {
   cf_draw_push_filter(CF_DRAW_FILTER_NEAREST);
 
-  // Render to the game canvas
+  // PASS 1: Render game scene to the game canvas.
   {
-    // Cornflower blue (6495ED) background
     cf_clear_color(100.0f / 255.0f, 149.0f / 255.0f, 237.0f / 255.0f, 1.0f);
     cf_clear_canvas(state->canvas);
-
     render_world();
-
-    // Draw game content to the canvas.
     cf_render_to(state->canvas, true);
   }
 
-  // Render canvas to the window with aspect ratio correction
+  // PASS 2: HRC lighting — collect lights, run compute pipeline.
+  {
+    LightingState* lt = &state->world.lighting;
+    CF_V2 cam = state->world.camera;
+
+    // Rebuild absorption each frame with current camera so it stays registered
+    // with the emissivity pass (both use the same camera-relative projection).
+    lighting_build_absorption(lt, &state->world.map, cam.x, cam.y);
+
+    lighting_begin_frame(lt);
+
+    // Re-add static lights from LDtk each frame.
+    for (int i = 0; i < state->world.lights_static_count; i++) {
+      Light* l = &state->world.lights_static[i];
+      lighting_add_light(lt, *l);
+    }
+
+    lighting_compute(lt, cam.x, cam.y);
+  }
+
+  // PASS 3: Render canvas + lighting composite to screen.
   {
     int window_w = cf_app_get_width();
     int window_h = cf_app_get_height();
 
-    cf_clear_color(0, 0, 0, 1.0f); // Black bars
+    cf_clear_color(0, 0, 0, 1.0f);  // black letterbox/pillarbox
 
     cf_app_set_canvas_size(window_w, window_h);
     CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
@@ -163,7 +220,23 @@ void game_render(void) {
 
     cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
 
-    // Restore projection for the next frame
+    // Composite fluence over canvas with multiply blend.
+    // Multiply: Result = fluence * canvas_already_on_screen
+    // blend: src=DST_COLOR, dst=ZERO → Result = src * dst_framebuffer
+    CF_RenderState rs             = cf_render_state_defaults();
+    rs.blend.rgb_src_blend_factor = CF_BLENDFACTOR_DST_COLOR;
+    rs.blend.rgb_dst_blend_factor = CF_BLENDFACTOR_ZERO;
+    rs.blend.rgb_op               = CF_BLEND_OP_ADD;
+    // Keep alpha channel unchanged.
+    rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
+    rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
+    rs.blend.alpha_op               = CF_BLEND_OP_ADD;
+    cf_draw_push_render_state(rs);
+    cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
+                   cf_v2(0, 0), dest);
+    cf_draw_pop_render_state();
+
+    // Restore projection for the next frame.
     cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
   }
 

@@ -131,6 +131,7 @@ void init_world(void) {
   }
 
   rain_init();
+  lighting_init(&state->world.lighting);
 }
 
 void update_world(float dt) {
@@ -168,7 +169,7 @@ void render_world(void) {
 
   cf_draw_pop();
 
-  rain_render(state->world.dt);
+  if (state->world.rain.enabled) rain_render(state->world.dt);
 }
 
 void world_hot_reload(void) {
@@ -185,6 +186,7 @@ void world_hot_reload(void) {
 }
 
 void shutdown_world(void) {
+  lighting_shutdown(&state->world.lighting);
   rain_shutdown();
 
   // Destroy any active coroutines
