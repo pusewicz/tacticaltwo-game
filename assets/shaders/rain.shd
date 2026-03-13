@@ -59,10 +59,10 @@ float rain_layer(vec2 world_pos, float base_speed, float cell_w, float cell_h, f
 	float drop_len = 0.4 + hash21(vec2(col_id, row_id + seed + 200.0)) * 0.45;
 
 	float dx = abs(col_uv - drop_x) * cell_w;
-	float streak = smoothstep(1.0, 0.2, dx);
+	float streak = 1.0 - step(0.5, dx);
 
-	streak *= smoothstep(0.0, 0.05, row_uv);
-	streak *= 1.0 - smoothstep(drop_len - 0.08, drop_len, row_uv);
+	streak *= step(0.02, row_uv);
+	streak *= 1.0 - step(drop_len, row_uv);
 	streak *= 0.7 + hash21(vec2(col_id, row_id)) * 0.3;
 
 	return streak;
@@ -92,8 +92,8 @@ vec4 shader(vec4 color, ShaderParams params) {
 
 				if (r > 0.5) {
 					float lx = fract(world_pos.x / 8.0);
-					float shape = smoothstep(0.4, 0.0, abs(lx - 0.5));
-					float sy = smoothstep(14.0, 0.0, dist) * smoothstep(-4.0, 0.0, dist);
+					float shape = 1.0 - step(0.3, abs(lx - 0.5));
+					float sy = step(-4.0, dist) * (1.0 - step(14.0, dist));
 					splash += shape * sy * 0.6 * u_intensity;
 				}
 			}
