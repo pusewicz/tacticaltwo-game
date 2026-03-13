@@ -186,6 +186,11 @@ void rain_render(float dt) {
     cf_draw_set_uniform_float("u_grid_size", (float)LDTK_GRID_SIZE);
     cf_draw_set_uniform_float("u_grid_width", (float)rain->mask_width);
     cf_draw_set_uniform_float("u_grid_height", (float)rain->mask_height);
+    cf_draw_set_uniform_float("u_splash_cell_size", rain->splash_cell_size);
+    cf_draw_set_uniform_float("u_splash_rate", rain->splash_rate);
+    cf_draw_set_uniform_float("u_splash_life", rain->splash_life);
+    cf_draw_set_uniform_float("u_splash_speed", rain->splash_speed);
+    cf_draw_set_uniform_float("u_splash_gravity", rain->splash_gravity);
     cf_draw_set_texture("collision_tex", rain->collision_mask);
     cf_draw_set_texture("height_tex", rain->height_map);
 

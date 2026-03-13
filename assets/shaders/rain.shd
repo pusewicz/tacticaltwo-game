@@ -14,6 +14,11 @@ layout (set = 3, binding = 1) uniform shd_uniforms {
 	float u_grid_size;
 	float u_grid_width;
 	float u_grid_height;
+	float u_splash_cell_size;
+	float u_splash_rate;
+	float u_splash_life;
+	float u_splash_speed;
+	float u_splash_gravity;
 };
 
 float hash21(vec2 p) {
@@ -26,7 +31,7 @@ float hash21(vec2 p) {
 vec2 world_to_grid_uv(vec2 wp) {
 	float gx = (wp.x + u_level_size.x * 0.5) / u_grid_size;
 	float gy = (u_level_size.y * 0.5 - wp.y) / u_grid_size;
-	return vec2((gx + 0.5) / u_grid_width, (gy + 0.5) / u_grid_height);
+	return vec2(gx / u_grid_width, gy / u_grid_height);
 }
 
 // Sample 2D collision mask
@@ -77,24 +82,55 @@ vec4 shader(vec4 color, ShaderParams params) {
 	// so splashes at the solid/empty boundary are not clipped)
 	float splash = 0.0;
 	float grid_col = (world_pos.x + u_level_size.x * 0.5) / u_grid_size;
-	float huv = (grid_col + 0.5) / u_grid_width;
+	float huv = grid_col / u_grid_width;
 
 	if (huv >= 0.0 && huv <= 1.0) {
 		float ground_row = texture(height_tex, vec2(huv, 0.5)).r * 255.0;
 		if (ground_row < 254.0) {
 			float ground_y = u_level_size.y * 0.5 - ground_row * u_grid_size;
-			float dist = world_pos.y - ground_y;
 
-			if (dist >= -4.0 && dist < 14.0) {
-				float cell_x = floor(world_pos.x / 8.0);
-				float t_bucket = floor(u_time * 8.0);
-				float r = hash21(vec2(cell_x, t_bucket));
+			// Animated pixel splashes: each cell spawns a burst of particles
+			float cell_x = floor(world_pos.x / u_splash_cell_size);
 
-				if (r > 0.5) {
-					float lx = fract(world_pos.x / 8.0);
-					float shape = 1.0 - step(0.3, abs(lx - 0.5));
-					float sy = step(-4.0, dist) * (1.0 - step(14.0, dist));
-					splash += shape * sy * 0.6 * u_intensity;
+			// Check multiple splash generations (overlapping cycles)
+			for (int gen = 0; gen < 3; gen++) {
+				float gen_offset = float(gen) * 0.37;
+				float cycle = floor((u_time + gen_offset) * u_splash_rate);
+				float cycle_t = fract((u_time + gen_offset) * u_splash_rate);
+
+				// Only some cells spawn a splash each cycle
+				float spawn = hash21(vec2(cell_x, cycle + float(gen) * 100.0));
+				if (spawn > 0.4 * u_density / 0.08) continue;
+
+				// Origin: random x within cell, at ground level
+				float ox = cell_x * u_splash_cell_size + hash21(vec2(cell_x + 7.0, cycle)) * u_splash_cell_size;
+				float oy = ground_y;
+
+				// Animate 3-5 tiny particles per splash
+				float num_particles = 3.0 + floor(hash21(vec2(cell_x, cycle + 50.0)) * 3.0);
+				float t = cycle_t / u_splash_life;
+				if (t > 1.0) continue;
+
+				for (float pi = 0.0; pi < 5.0; pi++) {
+					if (pi >= num_particles) break;
+
+					float pr = hash21(vec2(cell_x + pi * 13.0, cycle + pi * 7.0));
+					// Spread angle: particles fan out in upper half-circle
+					float angle = 0.3 + pr * 2.4; // ~17 to ~155 degrees
+					float spd = u_splash_speed * (0.8 + pr * 0.4);
+
+					// Particle position along arc with gravity, clamped to ground
+					float px = ox + cos(angle) * spd * t;
+					float py = max(oy + 1.0, oy + sin(angle) * spd * t - u_splash_gravity * t * t);
+
+					// Each particle is ~1 pixel
+					float dx = abs(world_pos.x - px);
+					float dy = abs(world_pos.y - py);
+					if (dx < 0.7 && dy < 0.7) {
+						// Fade out over lifetime
+						float fade = 1.0 - t * t;
+						splash += 0.7 * fade * u_intensity;
+					}
 				}
 			}
 		}
