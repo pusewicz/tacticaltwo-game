@@ -82,6 +82,35 @@ void make_player_at(float x, float y) {
 }
 
 // =============================================================================
+// Muzzle Flash
+// =============================================================================
+
+void world_trigger_muzzle_flash(float x, float y) {
+  MuzzleFlash* mf = &state->world.muzzle_flash;
+  mf->active      = true;
+  mf->x           = x;
+  mf->y           = y;
+  // Initialize tuning defaults on first use (survives hot-reload tweaks).
+  if (mf->duration == 0.0f) {
+    mf->duration       = 0.12f;
+    mf->peak_intensity = 2.2f;
+    mf->radius_min     = 80.0f;
+    mf->radius_max     = 180.0f;
+  }
+  mf->timer = mf->duration;
+}
+
+static void update_muzzle_flash(float dt) {
+  MuzzleFlash* mf = &state->world.muzzle_flash;
+  if (!mf->active) return;
+  mf->timer -= dt;
+  if (mf->timer <= 0.0f) {
+    mf->active = false;
+    mf->timer  = 0.0f;
+  }
+}
+
+// =============================================================================
 // World Lifecycle
 // =============================================================================
 
@@ -147,6 +176,7 @@ void update_world(float dt) {
 
   sys_gather_input();
   sys_player_coroutine();
+  update_muzzle_flash(dt);
   sys_update_player_movement();
   sys_apply_velocity();
   sys_collide_tilemap();

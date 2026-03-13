@@ -169,6 +169,30 @@ bool game_update(void) {
       ImGui_PopID();
     }
 
+    ImGui_SeparatorText("Muzzle Flash");
+    MuzzleFlash* mf = &state->world.muzzle_flash;
+    // Ensure defaults are set even if never fired yet.
+    if (mf->duration == 0.0f) {
+      mf->duration       = 0.12f;
+      mf->peak_intensity = 1.5f;
+      mf->radius_min     = 18.0f;
+      mf->radius_max     = 45.0f;
+    }
+    ImGui_SliderFloat("mf_duration", &mf->duration, 0.02f, 1.0f);
+    ImGui_SliderFloat("mf_intensity", &mf->peak_intensity, 0.1f, 10.0f);
+    ImGui_SliderFloat("mf_radius_min", &mf->radius_min, 1.0f, 100.0f);
+    ImGui_SliderFloat("mf_radius_max", &mf->radius_max, 1.0f, 200.0f);
+    ImGui_Text("active: %s  timer: %.3f", mf->active ? "true" : "false",
+               (double)mf->timer);
+    if (ImGui_Button("Test Fire")) {
+      int pid = state->world.player;
+      if (pid != ENTITY_NONE) {
+        Entity* pe = &state->world.entities[pid];
+        world_trigger_muzzle_flash(pe->transform.position.x,
+                                   pe->transform.position.y);
+      }
+    }
+
     ImGui_End();
   }
 
@@ -201,6 +225,25 @@ void game_render(void) {
     for (int i = 0; i < state->world.lights_static_count; i++) {
       Light* l = &state->world.lights_static[i];
       lighting_add_light(lt, *l);
+    }
+
+    // Muzzle flash dynamic light.
+    MuzzleFlash* mf = &state->world.muzzle_flash;
+    if (mf->active && mf->timer > 0.0f && mf->duration > 0.0f) {
+      float t     = 1.0f - (mf->timer / mf->duration);
+      float inv_t = 1.0f - t;
+      float range = mf->radius_max - mf->radius_min;
+      lighting_add_light(lt, (Light){
+          .x         = mf->x,
+          .y         = mf->y,
+          .r         = 1.0f,
+          .g         = 0.9f - 0.4f * t,
+          .b         = 0.5f - 0.4f * t,
+          .intensity = mf->peak_intensity * inv_t * inv_t,
+          .radius    = mf->radius_min + range * t,
+          .direction = 0.0f,
+          .cone      = 360.0f,
+      });
     }
 
     lighting_compute(lt, cam.x, cam.y);

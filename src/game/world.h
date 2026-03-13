@@ -115,6 +115,21 @@ typedef struct Parallax {
 } Parallax;
 
 // =============================================================================
+// Muzzle Flash (dynamic light injected into HRC)
+// =============================================================================
+
+typedef struct MuzzleFlash {
+  bool active;
+  float timer;     // counts down from duration
+  float x, y;      // world position at time of trigger
+  // Tunable parameters (tweakable via ImGui)
+  float duration;        // total duration in seconds
+  float peak_intensity;  // brightness at t=0
+  float radius_min;      // starting radius
+  float radius_max;      // ending radius
+} MuzzleFlash;
+
+// =============================================================================
 // World
 // =============================================================================
 
@@ -130,6 +145,7 @@ typedef struct World {
   // Static lights loaded from LDtk "Light" entities on level load.
   Light lights_static[LIGHTING_MAX_LIGHTS];
   int lights_static_count;
+  MuzzleFlash muzzle_flash;
 } World;
 
 // =============================================================================
@@ -149,6 +165,12 @@ void world_remove_entity(int id);
 
 // Create a player entity at the given position.
 void make_player_at(float x, float y);
+
+// =============================================================================
+// Muzzle Flash
+// =============================================================================
+
+void world_trigger_muzzle_flash(float x, float y);
 
 // =============================================================================
 // World Lifecycle

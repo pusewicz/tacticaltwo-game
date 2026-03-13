@@ -305,11 +305,12 @@ static void draw_emissivity(LightingState* s, float camera_x, float camera_y)
 
   CF_RenderState rs        = cf_render_state_defaults();
   rs.blend.pixel_format    = CF_PIXEL_FORMAT_R16G16B16A16_FLOAT;
+  // Additive blend: overlapping lights sum their energy instead of replacing.
   rs.blend.rgb_src_blend_factor   = CF_BLENDFACTOR_ONE;
-  rs.blend.rgb_dst_blend_factor   = CF_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+  rs.blend.rgb_dst_blend_factor   = CF_BLENDFACTOR_ONE;
   rs.blend.rgb_op                 = CF_BLEND_OP_ADD;
   rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ONE;
-  rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+  rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
   rs.blend.alpha_op               = CF_BLEND_OP_ADD;
   cf_draw_push_render_state(rs);
 

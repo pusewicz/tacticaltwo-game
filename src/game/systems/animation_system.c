@@ -52,6 +52,8 @@ static void player_behavior_fn(CF_Coroutine co) {
 
     if (input->shoot && input->crouch) {
       ps->current = PLAYER_STATE_CROUCH_FIRING;
+      world_trigger_muzzle_flash(e->transform.position.x,
+                                 e->transform.position.y);
       cf_sprite_play(sprite, "GunCrouchFire");
       while (!cf_sprite_will_finish(sprite)) {
         player_tick(co);
@@ -64,6 +66,8 @@ static void player_behavior_fn(CF_Coroutine co) {
 
     if (input->shoot) {
       ps->current           = PLAYER_STATE_FIRING;
+      world_trigger_muzzle_flash(e->transform.position.x,
+                                 e->transform.position.y);
       bool moving           = velocity->value.x != 0.0f;
       const char* anim_name = moving ? "GunWalkFire" : "GunFire";
       cf_sprite_play(sprite, anim_name);
