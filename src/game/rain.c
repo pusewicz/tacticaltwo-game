@@ -33,7 +33,8 @@ static void build_textures(RainState* rain, LdtkLevel* level) {
   // --- 2D collision mask (grid_width x grid_height) ---
   {
     int pixel_bytes = w * h * 4;
-    uint8_t* buf    = (uint8_t*)cf_alloc((size_t)pixel_bytes);
+    uint8_t* buf =
+        (uint8_t*)cf_arena_alloc(state->scratch_arena, pixel_bytes);
 
     for (int row = 0; row < h; row++) {
       for (int col = 0; col < w; col++) {
@@ -60,14 +61,14 @@ static void build_textures(RainState* rain, LdtkLevel* level) {
     }
 
     cf_texture_update(rain->collision_mask, buf, pixel_bytes);
-    cf_free(buf);
   }
 
   // --- 1D height map (grid_width x 1) ---
   // R channel = grid row of topmost solid tile (255 = no ground)
   {
     int pixel_bytes = w * 4;
-    uint8_t* buf    = (uint8_t*)cf_alloc((size_t)pixel_bytes);
+    uint8_t* buf =
+        (uint8_t*)cf_arena_alloc(state->scratch_arena, pixel_bytes);
 
     for (int col = 0; col < w; col++) {
       uint8_t ground_row = 255;
@@ -95,7 +96,6 @@ static void build_textures(RainState* rain, LdtkLevel* level) {
     }
 
     cf_texture_update(rain->height_map, buf, pixel_bytes);
-    cf_free(buf);
   }
 
   log_info("rain", "Built collision mask %dx%d + height map %d cols", w, h, w);
