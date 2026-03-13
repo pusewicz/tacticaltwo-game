@@ -6,6 +6,7 @@
 #include "rain.h"
 
 #include <cute_alloc.h>
+#include <cute_audio.h>
 #include <cute_draw.h>
 #include <cute_graphics.h>
 #include <cute_math.h>
@@ -102,6 +103,158 @@ static void build_textures(RainState* rain, LdtkLevel* level) {
 }
 
 // =============================================================================
+// Procedural Rain Audio
+// =============================================================================
+
+#define RAIN_SAMPLE_RATE  44100
+#define RAIN_DURATION_SEC 3
+#define RAIN_SAMPLE_COUNT (RAIN_SAMPLE_RATE * RAIN_DURATION_SEC) // 132300
+#define RAIN_CROSSFADE    22050 // 500ms
+#define RAIN_DEFAULT_MAX_VOLUME 0.6f
+#define RAIN_DEFAULT_CUTOFF_HZ  4500.0f
+#define RAIN_HIGHPASS_HZ        80.0f
+#define RAIN_PI                 3.14159265f
+
+static uint32_t xorshift32(uint32_t* s) {
+  uint32_t x = *s;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  *s = x;
+  return x;
+}
+
+// Biquad filter state and coefficients
+typedef struct {
+  float b0, b1, b2, a1, a2;
+  float x1, x2, y1, y2;
+} Biquad;
+
+static Biquad biquad_lowpass(float fc, float q, float sr) {
+  float w0    = 2.0f * RAIN_PI * fc / sr;
+  float sinw  = sinf(w0);
+  float cosw  = cosf(w0);
+  float alpha = sinw / (2.0f * q);
+  float a0    = 1.0f + alpha;
+  return (Biquad){
+      .b0 = ((1.0f - cosw) / 2.0f) / a0,
+      .b1 = (1.0f - cosw) / a0,
+      .b2 = ((1.0f - cosw) / 2.0f) / a0,
+      .a1 = (-2.0f * cosw) / a0,
+      .a2 = (1.0f - alpha) / a0,
+  };
+}
+
+static float biquad_process(Biquad* f, float x) {
+  float y = f->b0 * x + f->b1 * f->x1 + f->b2 * f->x2 -
+            f->a1 * f->y1 - f->a2 * f->y2;
+  f->x2 = f->x1;
+  f->x1 = x;
+  f->y2 = f->y1;
+  f->y1 = y;
+  return y;
+}
+
+static void* generate_rain_wav(float cutoff_hz, int* out_size) {
+  int data_bytes  = RAIN_SAMPLE_COUNT * 2; // 16-bit mono
+  int total_bytes = 44 + data_bytes;
+  uint8_t* buf    = (uint8_t*)cf_alloc((size_t)total_bytes);
+
+  // RIFF WAV header
+  memcpy(buf, "RIFF", 4);
+  uint32_t chunk_size = (uint32_t)(total_bytes - 8);
+  memcpy(buf + 4, &chunk_size, 4);
+  memcpy(buf + 8, "WAVE", 4);
+  memcpy(buf + 12, "fmt ", 4);
+  uint32_t fmt_size    = 16;
+  uint16_t audio_fmt   = 1; // PCM
+  uint16_t channels    = 1;
+  uint32_t sample_rate = RAIN_SAMPLE_RATE;
+  uint32_t byte_rate   = RAIN_SAMPLE_RATE * 2;
+  uint16_t block_align = 2;
+  uint16_t bits        = 16;
+  memcpy(buf + 16, &fmt_size, 4);
+  memcpy(buf + 20, &audio_fmt, 2);
+  memcpy(buf + 22, &channels, 2);
+  memcpy(buf + 24, &sample_rate, 4);
+  memcpy(buf + 28, &byte_rate, 4);
+  memcpy(buf + 32, &block_align, 2);
+  memcpy(buf + 34, &bits, 2);
+  memcpy(buf + 36, "data", 4);
+  uint32_t data_size = (uint32_t)data_bytes;
+  memcpy(buf + 40, &data_size, 4);
+
+  // Generate extra samples for overlap-add crossfade
+  int gen_count = RAIN_SAMPLE_COUNT + RAIN_CROSSFADE;
+  float* raw    = (float*)cf_alloc((size_t)gen_count * sizeof(float));
+
+  // Pink noise state (Kellet economy filter)
+  float pk0 = 0.0f, pk1 = 0.0f, pk2 = 0.0f;
+
+  // Biquad lowpass (Butterworth, Q=0.7071)
+  Biquad lp = biquad_lowpass(cutoff_hz, 0.7071f, (float)RAIN_SAMPLE_RATE);
+
+  // One-pole highpass at 80 Hz to cut sub-bass rumble
+  float hp_alpha  = 1.0f / (1.0f + (2.0f * RAIN_PI * RAIN_HIGHPASS_HZ) /
+                                        (float)RAIN_SAMPLE_RATE);
+  float hp_prev_x = 0.0f;
+  float hp_prev_y = 0.0f;
+
+  uint32_t rng_state = 0x12345678;
+
+  for (int i = 0; i < gen_count; i++) {
+    // White noise source
+    float white =
+        (float)xorshift32(&rng_state) / (float)UINT32_MAX * 2.0f - 1.0f;
+
+    // Kellet economy pink noise filter (-3 dB/octave)
+    pk0 = 0.99765f * pk0 + white * 0.0990460f;
+    pk1 = 0.96300f * pk1 + white * 0.2965164f;
+    pk2 = 0.57000f * pk2 + white * 1.0526913f;
+    float pink = pk0 + pk1 + pk2 + white * 0.1848f;
+    pink *= 0.11f; // normalize to roughly [-1, 1]
+
+    // Biquad lowpass
+    float filtered = biquad_process(&lp, pink);
+
+    // One-pole highpass
+    float hp_out = hp_alpha * (hp_prev_y + filtered - hp_prev_x);
+    hp_prev_x    = filtered;
+    hp_prev_y    = hp_out;
+
+    // Slow amplitude modulation (organic breathing)
+    float t  = (float)i / (float)RAIN_SAMPLE_RATE;
+    float am = 1.0f -
+               0.12f * (0.5f - 0.5f * sinf(2.0f * RAIN_PI * 0.31f * t)) -
+               0.12f * (0.5f - 0.5f * sinf(2.0f * RAIN_PI * 0.47f * t)) -
+               0.12f * (0.5f - 0.5f * sinf(2.0f * RAIN_PI * 0.73f * t));
+
+    raw[i] = hp_out * am;
+  }
+
+  // Overlap-add crossfade: blend the tail extension into the head
+  // so sample[N-1] flows seamlessly into sample[0] on loop
+  int16_t* samples = (int16_t*)(buf + 44);
+  for (int i = 0; i < RAIN_CROSSFADE; i++) {
+    float t = (float)i / (float)RAIN_CROSSFADE;
+    raw[i]  = raw[i] * t + raw[RAIN_SAMPLE_COUNT + i] * (1.0f - t);
+  }
+
+  // Convert to 16-bit PCM
+  for (int i = 0; i < RAIN_SAMPLE_COUNT; i++) {
+    int32_t s = (int32_t)(raw[i] * 20000.0f);
+    if (s > 32767) s = 32767;
+    if (s < -32767) s = -32767;
+    samples[i] = (int16_t)s;
+  }
+
+  cf_free(raw);
+
+  *out_size = total_bytes;
+  return buf;
+}
+
+// =============================================================================
 // Public API
 // =============================================================================
 
@@ -122,7 +275,27 @@ void rain_init(void) {
     build_textures(rain, &map->levels[map->active_level]);
   }
 
+  rain->cutoff_hz        = RAIN_DEFAULT_CUTOFF_HZ;
+  rain->max_volume       = RAIN_DEFAULT_MAX_VOLUME;
+  rain->splash_cell_size = 10.0f;
+  rain->splash_rate      = 6.0f;
+  rain->splash_life      = 0.25f;
+  rain->splash_speed     = 10.0f;
+  rain->splash_gravity   = 20.0f;
   rain->initialized = true;
+
+  // Generate procedural rain audio and start looped playback
+  int wav_size   = 0;
+  void* wav_data = generate_rain_wav(rain->cutoff_hz, &wav_size);
+  rain->audio    = cf_audio_load_wav_from_memory(wav_data, wav_size);
+  cf_free(wav_data);
+
+  CF_SoundParams params = cf_sound_params_defaults();
+  params.looped         = true;
+  params.volume         = rain->intensity * rain->max_volume;
+  rain->sound           = cf_play_sound(rain->audio, params);
+  rain->audio_playing   = true;
+
   log_info("rain", "Rain system initialized (intensity=%.1f)",
            (double)rain->intensity);
 }
@@ -137,6 +310,46 @@ void rain_rebuild_height_map(void) {
   if (map->loaded && map->active_level >= 0 &&
       map->active_level < map->level_count) {
     build_textures(rain, &map->levels[map->active_level]);
+  }
+}
+
+void rain_rebuild_audio(void) {
+  RainState* rain = &state->world.rain;
+  if (!rain->initialized) {
+    return;
+  }
+
+  if (rain->audio_playing) {
+    cf_sound_stop(rain->sound);
+    rain->audio_playing = false;
+  }
+  cf_audio_destroy(rain->audio);
+
+  int wav_size   = 0;
+  void* wav_data = generate_rain_wav(rain->cutoff_hz, &wav_size);
+  rain->audio    = cf_audio_load_wav_from_memory(wav_data, wav_size);
+  cf_free(wav_data);
+
+  CF_SoundParams params = cf_sound_params_defaults();
+  params.looped         = true;
+  params.volume         = rain->intensity * rain->max_volume;
+  rain->sound           = cf_play_sound(rain->audio, params);
+  rain->audio_playing   = true;
+}
+
+void rain_update_audio(void) {
+  RainState* rain = &state->world.rain;
+  if (!rain->initialized || !rain->audio_playing) {
+    return;
+  }
+
+  float volume = rain->intensity * rain->max_volume;
+  cf_sound_set_volume(rain->sound, volume);
+
+  if (rain->intensity <= 0.001f) {
+    cf_sound_set_is_paused(rain->sound, true);
+  } else {
+    cf_sound_set_is_paused(rain->sound, false);
   }
 }
 
@@ -207,6 +420,12 @@ void rain_shutdown(void) {
   if (!rain->initialized) {
     return;
   }
+
+  if (rain->audio_playing) {
+    cf_sound_stop(rain->sound);
+    rain->audio_playing = false;
+  }
+  cf_audio_destroy(rain->audio);
 
   if (rain->mask_width > 0) {
     cf_destroy_texture(rain->collision_mask);

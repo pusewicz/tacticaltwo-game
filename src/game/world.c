@@ -150,6 +150,7 @@ void update_world(float dt) {
   sys_apply_velocity();
   sys_collide_tilemap();
   sys_camera_follow();
+  rain_update_audio();
 }
 
 void render_world(void) {

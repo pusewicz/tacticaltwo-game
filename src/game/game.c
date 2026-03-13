@@ -135,6 +135,15 @@ bool game_update(void) {
     ImGui_SliderFloat("splash speed", &state->world.rain.splash_speed, 2.0f, 40.0f);
     ImGui_SliderFloat("gravity", &state->world.rain.splash_gravity, 5.0f, 80.0f);
 
+    ImGui_SeparatorText("Rain Audio");
+    ImGui_SliderFloat("max volume", &state->world.rain.max_volume, 0.0f, 1.0f);
+    float prev_cutoff = state->world.rain.cutoff_hz;
+    ImGui_SliderFloat("cutoff hz", &state->world.rain.cutoff_hz, 200.0f,
+                      10000.0f);
+    if (state->world.rain.cutoff_hz != prev_cutoff) {
+      rain_rebuild_audio();
+    }
+
     ImGui_SeparatorText("Night");
     ImGui_SliderFloat("night intensity", &state->world.night.intensity, 0.0f, 1.0f);
     ImGui_SliderFloat("desaturation", &state->world.night.desaturation, 0.0f, 1.0f);
