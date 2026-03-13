@@ -5,9 +5,9 @@
 #define GAME_VERSION "0.1.0"
 #define GAME_APP_ID "com.pusewicz.tacticaltwo"
 
-#define CANVAS_WIDTH 720
-#define CANVAS_HEIGHT 405
-#define CANVAS_SCALE 2
+#define CANVAS_WIDTH 480
+#define CANVAS_HEIGHT 270
+#define CANVAS_SCALE 3
 
 #define GRAVITY -500.0f // pixels/sec^2 (Y-up, so negative = downward)
 
