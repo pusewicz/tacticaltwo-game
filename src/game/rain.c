@@ -263,10 +263,10 @@ void rain_init(void) {
   memset(rain, 0, sizeof(RainState));
 
   rain->shader    = cf_make_draw_shader("rain.shd");
-  rain->intensity = 0.5f;
-  rain->density   = 0.08f;
-  rain->alpha     = 0.35f;
-  rain->speed     = 3.0f;
+  rain->intensity = 1.0f;
+  rain->density   = 1.0f;
+  rain->alpha     = 1.0f;
+  rain->speed     = 5.0f;
   rain->wind      = 0.05f;
 
   LdtkMap* map = &state->world.map;
@@ -277,10 +277,10 @@ void rain_init(void) {
 
   rain->cutoff_hz        = RAIN_DEFAULT_CUTOFF_HZ;
   rain->max_volume       = RAIN_DEFAULT_MAX_VOLUME;
-  rain->splash_cell_size = 10.0f;
-  rain->splash_rate      = 6.0f;
-  rain->splash_life      = 0.25f;
-  rain->splash_speed     = 10.0f;
+  rain->splash_cell_size = 24.0f;
+  rain->splash_rate      = 4.0f;
+  rain->splash_life      = 1.0f;
+  rain->splash_speed     = 20.0f;
   rain->splash_gravity   = 20.0f;
   rain->initialized = true;
 

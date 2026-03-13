@@ -122,17 +122,17 @@ bool game_update(void) {
     }
 
     ImGui_SeparatorText("Rain");
-    ImGui_SliderFloat("intensity", &state->world.rain.intensity, 0.0f, 1.0f);
-    ImGui_SliderFloat("density", &state->world.rain.density, 0.0f, 1.0f);
+    ImGui_SliderFloat("intensity", &state->world.rain.intensity, 0.0f, 3.0f);
+    ImGui_SliderFloat("density", &state->world.rain.density, 0.0f, 3.0f);
     ImGui_SliderFloat("alpha", &state->world.rain.alpha, 0.0f, 1.0f);
-    ImGui_SliderFloat("speed", &state->world.rain.speed, 0.1f, 5.0f);
+    ImGui_SliderFloat("speed", &state->world.rain.speed, 0.1f, 15.0f);
     ImGui_SliderFloat("wind", &state->world.rain.wind, -1.0f, 1.0f);
 
     ImGui_SeparatorText("Rain Splash");
     ImGui_SliderFloat("cell size", &state->world.rain.splash_cell_size, 4.0f, 30.0f);
     ImGui_SliderFloat("rate", &state->world.rain.splash_rate, 1.0f, 20.0f);
-    ImGui_SliderFloat("life", &state->world.rain.splash_life, 0.05f, 1.0f);
-    ImGui_SliderFloat("splash speed", &state->world.rain.splash_speed, 2.0f, 40.0f);
+    ImGui_SliderFloat("life", &state->world.rain.splash_life, 0.05f, 3.0f);
+    ImGui_SliderFloat("splash speed", &state->world.rain.splash_speed, 2.0f, 60.0f);
     ImGui_SliderFloat("gravity", &state->world.rain.splash_gravity, 5.0f, 80.0f);
 
     ImGui_SeparatorText("Rain Audio");

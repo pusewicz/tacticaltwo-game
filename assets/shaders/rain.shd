@@ -146,11 +146,24 @@ vec4 shader(vec4 color, ShaderParams params) {
 		return vec4(0.0);
 	}
 
-	// Rain streaks
+	// Rain streaks — suppress below the topmost solid tile in this column
 	float rain = 0.0;
-	rain += rain_layer(world_pos, 200.0, 90.0, 90.0,  0.0) * 0.22;
-	rain += rain_layer(world_pos, 260.0, 70.0, 70.0, 71.0) * 0.16;
-	rain *= u_intensity;
+	bool sheltered = false;
+	if (huv >= 0.0 && huv <= 1.0) {
+		float top_row = texture(height_tex, vec2(huv, 0.5)).r * 255.0;
+		if (top_row < 254.0) {
+			float ceiling_y = u_level_size.y * 0.5 - top_row * u_grid_size;
+			if (world_pos.y < ceiling_y) {
+				sheltered = true;
+			}
+		}
+	}
+
+	if (!sheltered) {
+		rain += rain_layer(world_pos, 200.0, 90.0, 90.0,  0.0) * 0.22;
+		rain += rain_layer(world_pos, 260.0, 70.0, 70.0, 71.0) * 0.16;
+		rain *= u_intensity;
+	}
 
 	float alpha = clamp(rain + splash, 0.0, u_alpha);
 	vec3 rain_color = vec3(0.78, 0.82, 1.0);
