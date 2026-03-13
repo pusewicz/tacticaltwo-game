@@ -56,9 +56,13 @@ static CF_V2 calculate_dest_size(CF_V2 game, CF_V2 window) {
 static bool ensure_composite_canvas(void) {
   int w = cf_app_get_width();
   int h = cf_app_get_height();
-  if (w <= 0 || h <= 0) return false;
+  if (w <= 0 || h <= 0) {
+    return false;
+  }
 
-  if (state->composite_w == w && state->composite_h == h) return true;
+  if (state->composite_w == w && state->composite_h == h) {
+    return true;
+  }
 
   // Destroy old canvas if it existed.
   if (state->composite_w > 0) {
@@ -104,6 +108,29 @@ bool game_update(void) {
   update_world(CF_DELTA_TIME);
 
   if (state->debug_mode) {
+    // Create a full-viewport dockspace.
+    ImGui_DockSpaceOverViewport();
+
+    // --- Game window: display composite canvas texture ---
+    ImGui_Begin("Game", nullptr, 0);
+    if (state->composite_w > 0) {
+      ImVec2 avail = ImGui_GetContentRegionAvail();
+      // Maintain game aspect ratio within available space.
+      float game_aspect = (float)CANVAS_WIDTH / (float)CANVAS_HEIGHT;
+      float w = avail.x;
+      float h = w / game_aspect;
+      if (h > avail.y) {
+        h = avail.y;
+        w = h * game_aspect;
+      }
+      CF_Texture tex = cf_canvas_get_target(state->composite_canvas);
+      uint64_t tex_id = cf_texture_handle(tex);
+      ImTextureRef ref = { ._TexData = nullptr, ._TexID = tex_id };
+      ImGui_Image(ref, (ImVec2){w, h});
+    }
+    ImGui_End();
+
+    // --- Debug window: all debug controls ---
     ImGui_Begin("Debug", &state->debug_mode, 0);
 
     int p = state->world.player;
@@ -152,7 +179,6 @@ bool game_update(void) {
     ImGui_SeparatorText("Lighting (HRC)");
     LightingState* lt = &state->world.lighting;
     ImGui_SliderFloat("ambient", &lt->ambient, 0.0f, 1.0f);
-    // Grid size selector (64, 128, 256, 512).
     int grid_sizes[] = {64, 128, 256, 512};
     int grid_idx = 0;
     for (int i = 0; i < 4; i++) {
@@ -165,7 +191,6 @@ bool game_update(void) {
     ImGui_Checkbox("cminus1", (bool*)&lt->cminus1);
     ImGui_SliderInt("trace_levels", &lt->trace_levels, 0, lt->n + 1);
 
-    // Per-light controls for static lights from LDtk.
     for (int i = 0; i < state->world.lights_static_count; i++) {
       Light* l = &state->world.lights_static[i];
       ImGui_PushIDInt(i);
@@ -191,7 +216,6 @@ bool game_update(void) {
 
     ImGui_SeparatorText("Muzzle Flash");
     MuzzleFlash* mf = &state->world.muzzle_flash;
-    // Ensure defaults are set even if never fired yet.
     if (mf->duration == 0.0f) {
       mf->duration       = 0.12f;
       mf->peak_intensity = 1.5f;
@@ -269,28 +293,25 @@ void game_render(void) {
     lighting_compute(lt, cam.x, cam.y);
   }
 
-  // PASS 3: Render canvas + lighting composite to screen.
-  {
-    int window_w = cf_app_get_width();
-    int window_h = cf_app_get_height();
+  // PASS 3: Composite game + lighting.
+  if (state->debug_mode && ensure_composite_canvas()) {
+    // Debug mode: render to composite canvas (displayed via ImGui Image).
+    int w = state->composite_w;
+    int h = state->composite_h;
 
-    cf_clear_color(0, 0, 0, 1.0f);  // black letterbox/pillarbox
+    cf_clear_color(0, 0, 0, 1.0f);
+    cf_clear_canvas(state->composite_canvas);
 
-    cf_app_set_canvas_size(window_w, window_h);
     CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
-                                     cf_v2((float)window_w, (float)window_h));
-    cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
+                                     cf_v2((float)w, (float)h));
+    cf_draw_projection(cf_ortho_2d(0, 0, (float)w, (float)h));
 
     cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
 
-    // Composite fluence over canvas with multiply blend.
-    // Multiply: Result = fluence * canvas_already_on_screen
-    // blend: src=DST_COLOR, dst=ZERO → Result = src * dst_framebuffer
     CF_RenderState rs             = cf_render_state_defaults();
     rs.blend.rgb_src_blend_factor = CF_BLENDFACTOR_DST_COLOR;
     rs.blend.rgb_dst_blend_factor = CF_BLENDFACTOR_ZERO;
     rs.blend.rgb_op               = CF_BLEND_OP_ADD;
-    // Keep alpha channel unchanged.
     rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
     rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
     rs.blend.alpha_op               = CF_BLEND_OP_ADD;
@@ -299,7 +320,35 @@ void game_render(void) {
                    cf_v2(0, 0), dest);
     cf_draw_pop_render_state();
 
-    // Restore projection for the next frame.
+    cf_render_to(state->composite_canvas, true);
+
+    cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+  } else {
+    // Normal mode: render to screen (existing behavior).
+    int window_w = cf_app_get_width();
+    int window_h = cf_app_get_height();
+
+    cf_clear_color(0, 0, 0, 1.0f);
+
+    cf_app_set_canvas_size(window_w, window_h);
+    CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
+                                     cf_v2((float)window_w, (float)window_h));
+    cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
+
+    cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+
+    CF_RenderState rs             = cf_render_state_defaults();
+    rs.blend.rgb_src_blend_factor = CF_BLENDFACTOR_DST_COLOR;
+    rs.blend.rgb_dst_blend_factor = CF_BLENDFACTOR_ZERO;
+    rs.blend.rgb_op               = CF_BLEND_OP_ADD;
+    rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
+    rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
+    rs.blend.alpha_op               = CF_BLEND_OP_ADD;
+    cf_draw_push_render_state(rs);
+    cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
+                   cf_v2(0, 0), dest);
+    cf_draw_pop_render_state();
+
     cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
   }
 
