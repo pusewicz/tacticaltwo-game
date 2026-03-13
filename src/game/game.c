@@ -51,6 +51,26 @@ static CF_V2 calculate_dest_size(CF_V2 game, CF_V2 window) {
   return cf_v2(dest_w, dest_h);
 }
 
+// Ensure composite canvas exists and matches current window dimensions.
+// Returns false if window has zero size (minimized).
+static bool ensure_composite_canvas(void) {
+  int w = cf_app_get_width();
+  int h = cf_app_get_height();
+  if (w <= 0 || h <= 0) return false;
+
+  if (state->composite_w == w && state->composite_h == h) return true;
+
+  // Destroy old canvas if it existed.
+  if (state->composite_w > 0) {
+    cf_destroy_canvas(state->composite_canvas);
+  }
+
+  state->composite_canvas = cf_make_canvas(cf_canvas_defaults(w, h));
+  state->composite_w = w;
+  state->composite_h = h;
+  return true;
+}
+
 void game_init(Platform* platform) {
   state = calloc(1, sizeof(GameState));
   CF_ASSERT(state != nullptr);
@@ -288,6 +308,9 @@ void game_render(void) {
 
 void game_shutdown(void) {
   shutdown_world();
+  if (state->composite_w > 0) {
+    cf_destroy_canvas(state->composite_canvas);
+  }
   cf_destroy_canvas(state->canvas);
   cf_destroy_arena(state->scratch_arena);
   free(state->scratch_arena);
