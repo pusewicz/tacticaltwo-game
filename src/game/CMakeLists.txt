@@ -6,6 +6,7 @@ add_library(${NAME} SHARED
   ldtk.c
   night.c
   rain.c
+  tweaks.c
   systems/input_system.c
   systems/player_system.c
   systems/physics_system.c

@@ -20,6 +20,7 @@
 #include "ldtk.h"
 #include "night.h"
 #include "rain.h"
+#include "tweaks.h"
 #include "world.h"
 
 GameState* state = nullptr;
@@ -74,6 +75,7 @@ void game_init(Platform* platform) {
 
   init_world();
   night_init();
+  tweaks_load();
 
   // Global shader hot-reload callback (supersedes rain.c's callback)
   cf_shader_on_changed(on_shader_changed, nullptr);
@@ -148,6 +150,11 @@ bool game_update(void) {
     ImGui_SliderFloat("night intensity", &state->world.night.intensity, 0.0f, 1.0f);
     ImGui_SliderFloat("desaturation", &state->world.night.desaturation, 0.0f, 1.0f);
     ImGui_ColorEdit3("night tint", state->world.night.tint, 0);
+
+    ImGui_SeparatorText("Tweaks");
+    if (ImGui_Button("Save Tweaks")) {
+      tweaks_save();
+    }
 
     ImGui_End();
   }
