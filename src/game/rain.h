@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <cute_audio.h>
 #include <cute_graphics.h>
 #include <stdbool.h>
 
@@ -22,11 +21,7 @@ typedef struct RainState {
   int mask_width;
   int mask_height;
   bool initialized;
-  CF_Audio audio;            // loaded WAV resource
-  CF_Sound sound;            // playing looped instance
-  bool audio_playing;        // whether sound handle is active
-  float cutoff_hz;           // low-pass filter cutoff frequency
-  float max_volume;          // max audio volume at full intensity
+  bool enabled;
   float splash_cell_size;    // spacing between splash origins (pixels)
   float splash_rate;         // bursts per second per cell
   float splash_life;         // duration of each burst (seconds)
@@ -42,12 +37,6 @@ void rain_rebuild_height_map(void);
 
 // Render rain overlay. Call after world geometry, in canvas space (no camera transform).
 void rain_render(float dt);
-
-// Regenerate rain audio (call after changing cutoff_hz).
-void rain_rebuild_audio(void);
-
-// Update rain audio volume to match intensity.
-void rain_update_audio(void);
 
 // Clean up GPU resources.
 void rain_shutdown(void);
