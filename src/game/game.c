@@ -51,6 +51,19 @@ static CF_V2 calculate_dest_size(CF_V2 game, CF_V2 window) {
   return cf_v2(dest_w, dest_h);
 }
 
+// Multiply: Result = fluence * canvas = src * dst_framebuffer
+static CF_RenderState multiply_blend_state(void) {
+  CF_RenderState rs               = cf_render_state_defaults();
+  rs.blend.rgb_src_blend_factor   = CF_BLENDFACTOR_DST_COLOR;
+  rs.blend.rgb_dst_blend_factor   = CF_BLENDFACTOR_ZERO;
+  rs.blend.rgb_op                 = CF_BLEND_OP_ADD;
+  // Keep alpha channel unchanged.
+  rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
+  rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
+  rs.blend.alpha_op               = CF_BLEND_OP_ADD;
+  return rs;
+}
+
 // Ensure composite canvas exists and matches current window dimensions.
 // Returns false if window has zero size (minimized).
 static bool ensure_composite_canvas(void) {
@@ -294,62 +307,52 @@ void game_render(void) {
   }
 
   // PASS 3: Composite game + lighting.
-  if (state->debug_mode && ensure_composite_canvas()) {
-    // Debug mode: render to composite canvas (displayed via ImGui Image).
-    int w = state->composite_w;
-    int h = state->composite_h;
-
-    cf_clear_color(0, 0, 0, 1.0f);
-    cf_clear_canvas(state->composite_canvas);
-
-    CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
-                                     cf_v2((float)w, (float)h));
-    cf_draw_projection(cf_ortho_2d(0, 0, (float)w, (float)h));
-
-    cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
-
-    CF_RenderState rs             = cf_render_state_defaults();
-    rs.blend.rgb_src_blend_factor = CF_BLENDFACTOR_DST_COLOR;
-    rs.blend.rgb_dst_blend_factor = CF_BLENDFACTOR_ZERO;
-    rs.blend.rgb_op               = CF_BLEND_OP_ADD;
-    rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
-    rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
-    rs.blend.alpha_op               = CF_BLEND_OP_ADD;
-    cf_draw_push_render_state(rs);
-    cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
-                   cf_v2(0, 0), dest);
-    cf_draw_pop_render_state();
-
-    cf_render_to(state->composite_canvas, true);
-
-    cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
-  } else {
-    // Normal mode: render to screen (existing behavior).
+  {
     int window_w = cf_app_get_width();
     int window_h = cf_app_get_height();
-
+    cf_app_set_canvas_size(window_w, window_h);
     cf_clear_color(0, 0, 0, 1.0f);
 
-    cf_app_set_canvas_size(window_w, window_h);
-    CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
-                                     cf_v2((float)window_w, (float)window_h));
-    cf_draw_projection(cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
+    if (state->debug_mode && ensure_composite_canvas()) {
+      // Debug mode: render to composite canvas (displayed via ImGui Image).
+      int w = state->composite_w;
+      int h = state->composite_h;
 
-    cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+      cf_clear_canvas(state->composite_canvas);
 
-    CF_RenderState rs             = cf_render_state_defaults();
-    rs.blend.rgb_src_blend_factor = CF_BLENDFACTOR_DST_COLOR;
-    rs.blend.rgb_dst_blend_factor = CF_BLENDFACTOR_ZERO;
-    rs.blend.rgb_op               = CF_BLEND_OP_ADD;
-    rs.blend.alpha_src_blend_factor = CF_BLENDFACTOR_ZERO;
-    rs.blend.alpha_dst_blend_factor = CF_BLENDFACTOR_ONE;
-    rs.blend.alpha_op               = CF_BLEND_OP_ADD;
-    cf_draw_push_render_state(rs);
-    cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
-                   cf_v2(0, 0), dest);
-    cf_draw_pop_render_state();
+      CF_V2 dest = calculate_dest_size(cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
+                                       cf_v2((float)w, (float)h));
+      cf_draw_projection(cf_ortho_2d(0, 0, (float)w, (float)h));
 
-    cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+      cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+
+      cf_draw_push_render_state(multiply_blend_state());
+      cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
+                     cf_v2(0, 0), dest);
+      cf_draw_pop_render_state();
+
+      cf_render_to(state->composite_canvas, true);
+
+      // Restore projection for the next frame.
+      cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+    } else {
+      // Normal mode: render to screen.
+      CF_V2 dest = calculate_dest_size(
+          cf_v2(CANVAS_WIDTH, CANVAS_HEIGHT),
+          cf_v2((float)window_w, (float)window_h));
+      cf_draw_projection(
+          cf_ortho_2d(0, 0, (float)window_w, (float)window_h));
+
+      cf_draw_canvas(state->canvas, cf_v2(0, 0), dest);
+
+      cf_draw_push_render_state(multiply_blend_state());
+      cf_draw_canvas(lighting_fluence_canvas(&state->world.lighting),
+                     cf_v2(0, 0), dest);
+      cf_draw_pop_render_state();
+
+      // Restore projection for the next frame.
+      cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT));
+    }
   }
 
   cf_draw_pop_filter();
