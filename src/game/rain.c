@@ -109,7 +109,6 @@ void rain_init(void) {
   RainState* rain = &state->world.rain;
   memset(rain, 0, sizeof(RainState));
 
-  cf_shader_directory("/assets/shaders");
   rain->shader    = cf_make_draw_shader("rain.shd");
   rain->intensity = 0.5f;
   rain->density   = 0.08f;

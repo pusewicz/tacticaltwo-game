@@ -70,6 +70,8 @@ void game_init(Platform* platform) {
   cf_draw_projection(cf_ortho_2d(0, 0, CANVAS_WIDTH * CANVAS_SCALE,
                                  CANVAS_HEIGHT * CANVAS_SCALE));
 
+  cf_shader_directory("/assets/shaders");
+
   init_world();
   night_init();
 

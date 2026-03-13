@@ -15,7 +15,6 @@
 void night_init(void) {
   NightState* night = &state->world.night;
 
-  cf_shader_directory("/assets/shaders");
   night->shader      = cf_make_draw_shader("night.shd");
   night->intensity   = NIGHT_INTENSITY;
   night->desaturation = NIGHT_DESATURATION;
