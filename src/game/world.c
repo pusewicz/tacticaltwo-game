@@ -13,6 +13,7 @@
 #include "../engine/game_state.h"
 #include "../engine/log.h"
 #include "ldtk.h"
+#include "rain.h"
 #include "systems/systems.h"
 
 // =============================================================================
@@ -128,6 +129,8 @@ void init_world(void) {
   if (p != ENTITY_NONE) {
     state->world.camera = state->world.entities[p].transform.position;
   }
+
+  rain_init();
 }
 
 void update_world(float dt) {
@@ -137,7 +140,9 @@ void update_world(float dt) {
   }
   state->world.dt = dt;
 
-  ldtk_check_reload(&state->world.map);
+  if (ldtk_check_reload(&state->world.map)) {
+    rain_rebuild_height_map();
+  }
 
   sys_gather_input();
   sys_player_coroutine();
@@ -162,6 +167,8 @@ void render_world(void) {
   }
 
   cf_draw_pop();
+
+  rain_render(state->world.dt);
 }
 
 void world_hot_reload(void) {
@@ -178,6 +185,8 @@ void world_hot_reload(void) {
 }
 
 void shutdown_world(void) {
+  rain_shutdown();
+
   // Destroy any active coroutines
   for (int i = 0; i < MAX_ENTITIES; i++) {
     Entity* e = &state->world.entities[i];

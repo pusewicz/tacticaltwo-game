@@ -1,0 +1,123 @@
+layout (set = 2, binding = 1) uniform sampler2D collision_tex;
+layout (set = 2, binding = 2) uniform sampler2D height_tex;
+
+layout (set = 3, binding = 1) uniform shd_uniforms {
+	float u_time;
+	float u_intensity;
+	float u_density;
+	float u_alpha;
+	float u_speed;
+	float u_wind;
+	vec2 u_camera;
+	vec2 u_canvas_size;
+	vec2 u_level_size;
+	float u_grid_size;
+	float u_grid_width;
+	float u_grid_height;
+};
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+// World position to collision mask UV
+vec2 world_to_grid_uv(vec2 wp) {
+	float gx = (wp.x + u_level_size.x * 0.5) / u_grid_size;
+	float gy = (u_level_size.y * 0.5 - wp.y) / u_grid_size;
+	return vec2((gx + 0.5) / u_grid_width, (gy + 0.5) / u_grid_height);
+}
+
+// Sample 2D collision mask
+bool is_solid(vec2 wp) {
+	vec2 uv = world_to_grid_uv(wp);
+	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return false;
+	return texture(collision_tex, uv).r > 0.5;
+}
+
+// Rain layer with per-column randomized speed
+float rain_layer(vec2 world_pos, float base_speed, float cell_w, float cell_h, float seed) {
+	vec2 p = world_pos;
+	p.x += p.y * u_wind;
+
+	float col_id = floor(p.x / cell_w);
+	float col_uv = fract(p.x / cell_w);
+
+	float rx = hash21(vec2(col_id, seed));
+	float col_speed = base_speed * (0.6 + rx * 0.8) * u_speed;
+
+	float fall_y = p.y + u_time * col_speed;
+
+	float row_id = floor(fall_y / cell_h);
+	float row_uv = fract(fall_y / cell_h);
+
+	float r_exists = hash21(vec2(col_id, row_id + seed));
+	if (r_exists > u_density) return 0.0;
+
+	float drop_x = hash21(vec2(col_id + seed, row_id + 50.0)) * 0.6 + 0.2;
+	float drop_len = 0.4 + hash21(vec2(col_id, row_id + seed + 200.0)) * 0.45;
+
+	float dx = abs(col_uv - drop_x) * cell_w;
+	float streak = smoothstep(1.0, 0.2, dx);
+
+	streak *= smoothstep(0.0, 0.05, row_uv);
+	streak *= 1.0 - smoothstep(drop_len - 0.08, drop_len, row_uv);
+	streak *= 0.7 + hash21(vec2(col_id, row_id)) * 0.3;
+
+	return streak;
+}
+
+vec4 shader(vec4 color, ShaderParams params) {
+	vec2 world_pos;
+	world_pos.x = u_camera.x + (params.screen_uv.x - 0.5) * u_canvas_size.x;
+	world_pos.y = u_camera.y + (0.5 - params.screen_uv.y) * u_canvas_size.y;
+
+	// Ground splashes using 1D height map (computed before occlusion check
+	// so splashes at the solid/empty boundary are not clipped)
+	float splash = 0.0;
+	float grid_col = (world_pos.x + u_level_size.x * 0.5) / u_grid_size;
+	float huv = (grid_col + 0.5) / u_grid_width;
+
+	if (huv >= 0.0 && huv <= 1.0) {
+		float ground_row = texture(height_tex, vec2(huv, 0.5)).r * 255.0;
+		if (ground_row < 254.0) {
+			float ground_y = u_level_size.y * 0.5 - ground_row * u_grid_size;
+			float dist = world_pos.y - ground_y;
+
+			if (dist >= -4.0 && dist < 14.0) {
+				float cell_x = floor(world_pos.x / 8.0);
+				float t_bucket = floor(u_time * 8.0);
+				float r = hash21(vec2(cell_x, t_bucket));
+
+				if (r > 0.5) {
+					float lx = fract(world_pos.x / 8.0);
+					float shape = smoothstep(0.4, 0.0, abs(lx - 0.5));
+					float sy = smoothstep(14.0, 0.0, dist) * smoothstep(-4.0, 0.0, dist);
+					splash += shape * sy * 0.6 * u_intensity;
+				}
+			}
+		}
+	}
+
+	// Occlude rain inside solid tiles (but allow splashes through)
+	if (is_solid(world_pos)) {
+		if (splash > 0.001) {
+			float alpha = clamp(splash, 0.0, u_alpha);
+			vec3 rain_color = vec3(0.78, 0.82, 1.0);
+			return vec4(rain_color * alpha, alpha);
+		}
+		return vec4(0.0);
+	}
+
+	// Rain streaks
+	float rain = 0.0;
+	rain += rain_layer(world_pos, 200.0, 90.0, 90.0,  0.0) * 0.22;
+	rain += rain_layer(world_pos, 260.0, 70.0, 70.0, 71.0) * 0.16;
+	rain *= u_intensity;
+
+	float alpha = clamp(rain + splash, 0.0, u_alpha);
+	vec3 rain_color = vec3(0.78, 0.82, 1.0);
+
+	return vec4(rain_color * alpha, alpha);
+}

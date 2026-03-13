@@ -1,0 +1,23 @@
+layout (set = 3, binding = 1) uniform shd_uniforms {
+	float u_intensity;
+	float u_desaturation;
+	float u_tint_r;
+	float u_tint_g;
+	float u_tint_b;
+};
+
+vec4 shader(vec4 color, ShaderParams params) {
+	// Luminance (perceived brightness)
+	float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+
+	// Desaturate: lerp toward grayscale
+	vec3 desaturated = mix(color.rgb, vec3(lum), u_desaturation);
+
+	// Apply night tint (blue-shift + darkening)
+	vec3 tinted = desaturated * vec3(u_tint_r, u_tint_g, u_tint_b);
+
+	// Lerp between original and night version based on intensity
+	vec3 result = mix(color.rgb, tinted, u_intensity);
+
+	return vec4(result, color.a);
+}

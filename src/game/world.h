@@ -12,6 +12,8 @@
 #include <stdbool.h>
 
 #include "ldtk.h"
+#include "night.h"
+#include "rain.h"
 
 // =============================================================================
 // Constants
@@ -123,6 +125,8 @@ typedef struct World {
   CF_V2 camera;
   Parallax parallax;
   LdtkMap map;
+  NightState night;
+  RainState rain;
 } World;
 
 // =============================================================================

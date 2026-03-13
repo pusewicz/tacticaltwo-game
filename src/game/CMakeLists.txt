@@ -4,6 +4,8 @@ add_library(${NAME} SHARED
   game.c
   world.c
   ldtk.c
+  night.c
+  rain.c
   systems/input_system.c
   systems/player_system.c
   systems/physics_system.c
