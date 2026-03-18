@@ -74,29 +74,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORR-01 | — | Pending |
-| CORR-02 | — | Pending |
-| CORR-03 | — | Pending |
-| CORR-04 | — | Pending |
-| CORR-05 | — | Pending |
-| CORR-06 | — | Pending |
-| CORR-07 | — | Pending |
-| CORR-08 | — | Pending |
-| ENTS-01 | — | Pending |
-| ENTS-02 | — | Pending |
-| ENTS-03 | — | Pending |
-| REND-01 | — | Pending |
-| REND-02 | — | Pending |
-| REND-03 | — | Pending |
-| DEVX-01 | — | Pending |
-| DEVX-02 | — | Pending |
-| DEVX-03 | — | Pending |
+| CORR-01 | Phase 2 | Pending |
+| CORR-02 | Phase 3 | Pending |
+| CORR-03 | Phase 3 | Pending |
+| CORR-04 | Phase 4 | Pending |
+| CORR-05 | Phase 4 | Pending |
+| CORR-06 | Phase 3 | Pending |
+| CORR-07 | Phase 1 | Pending |
+| CORR-08 | Phase 1 | Pending |
+| ENTS-01 | Phase 6 | Pending |
+| ENTS-02 | Phase 5 | Pending |
+| ENTS-03 | Phase 6 | Pending |
+| REND-01 | Phase 7 | Pending |
+| REND-02 | Phase 8 | Pending |
+| REND-03 | Phase 9 | Pending |
+| DEVX-01 | Phase 10 | Pending |
+| DEVX-02 | Phase 10 | Pending |
+| DEVX-03 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17
+- Mapped to phases: 17
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-18*
-*Last updated: 2026-03-18 after initial definition*
+*Last updated: 2026-03-18 after roadmap creation — all 17 requirements mapped*
