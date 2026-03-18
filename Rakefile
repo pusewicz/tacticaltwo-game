@@ -88,3 +88,34 @@ task watch: "cmake:sanitize:configure" do
   listener.start
   sleep
 end
+
+namespace :analyze do
+  desc "Run clang-tidy on all src/ files (advisory report)"
+  task clang_tidy: "cmake:sanitize:configure" do
+    mkdir_p "reports"
+    sdk = `xcrun --show-sdk-path`.strip
+    sh "/opt/homebrew/opt/llvm/bin/run-clang-tidy " \
+       "-p build/sanitize " \
+       "-source-filter '.*/tacticaltwo-game/src/.*' " \
+       "-extra-arg=-isysroot#{sdk} " \
+       "-quiet 2>&1 | tee reports/clang-tidy.txt; true"
+    puts "\nclang-tidy report written to reports/clang-tidy.txt"
+  end
+
+  desc "Run cppcheck on src/ (advisory report)"
+  task :cppcheck do
+    mkdir_p "reports"
+    sh "cppcheck " \
+       "--project=compile_commands.json " \
+       "--std=c23 " \
+       "--enable=all " \
+       "--suppress=missingIncludeSystem " \
+       "--file-filter='*/src/*' " \
+       "--output-file=reports/cppcheck.txt " \
+       "--error-exitcode=0 2>&1 | tee -a reports/cppcheck.txt; true"
+    puts "\ncppcheck report written to reports/cppcheck.txt"
+  end
+
+  desc "Run all static analysis (clang-tidy + cppcheck)"
+  task all: [:clang_tidy, :cppcheck]
+end

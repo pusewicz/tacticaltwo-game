@@ -57,3 +57,4 @@ imgui.ini
 compile_commands.json
 
 .env
+/reports/
