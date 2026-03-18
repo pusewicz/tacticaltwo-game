@@ -11,6 +11,23 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 # Hot-reload option: ON for development, OFF for release
 option(ENABLE_HOT_RELOADING "Enable hot code reloading (shared library)" ON)
 
+# Sanitize build type: ASan + UBSan instrumentation (default for development)
+set(CMAKE_C_FLAGS_SANITIZE
+    "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1"
+    CACHE STRING "Flags used for the Sanitize build type" FORCE)
+set(CMAKE_CXX_FLAGS_SANITIZE
+    "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1"
+    CACHE STRING "Flags used for the Sanitize build type" FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
+    "-fsanitize=address,undefined"
+    CACHE STRING "Linker flags for the Sanitize build type" FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_SANITIZE
+    "-fsanitize=address,undefined"
+    CACHE STRING "Shared linker flags for the Sanitize build type" FORCE)
+
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "RelWithDebInfo" "MinSizeRel" "Sanitize")
+
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -35,7 +52,7 @@ foreach(target ${TARGETS})
     )
 
     target_compile_definitions(${target} PRIVATE
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:DEBUG>
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>,$<CONFIG:Sanitize>>:DEBUG>
         $<$<CONFIG:Release>:RELEASE>
         $<$<PLATFORM_ID:Windows>:PLATFORM_WINDOWS>
         $<$<PLATFORM_ID:Linux>:PLATFORM_LINUX>
