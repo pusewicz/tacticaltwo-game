@@ -21,17 +21,21 @@ tech-stack:
   added: ["ASan (AddressSanitizer)", "UBSan (UndefinedBehaviorSanitizer)"]
   patterns:
     - "Sanitize CMake build type pattern: cmake -B build/sanitize -G Ninja -DCMAKE_BUILD_TYPE=Sanitize"
-    - "Shader tools disabled in Sanitize build to avoid C++ static archive ASan link failures"
+    - "Sanitizer ignorelist excludes vendor/ and system headers from UBSan instrumentation"
+    - "Vendor NDEBUG in Sanitize builds suppresses known false assertions"
 
 key-files:
-  created: []
+  created:
+    - "sanitizer-ignorelist.txt"
   modified:
     - "CMakeLists.txt"
     - "Rakefile"
 
 key-decisions:
   - "Make Sanitize the default development build rather than RelWithDebInfo — every dev session now catches memory errors automatically"
-  - "Disable CF_CUTE_SHADERC and CF_RUNTIME_SHADER_COMPILATION in Sanitize build — pre-compiled C++ static archives (libglslang, etc.) cause typeinfo linker failures with ASan linker flags; offline shader tools not needed for dev iteration"
+  - "Keep CF_CUTE_SHADERC=ON — game needs runtime shader compilation for lighting compute shaders; disable vptr UBSan check instead to resolve RTTI link conflict"
+  - "Add sanitizer ignorelist to exclude vendor/ and system headers from UBSan instrumentation"
+  - "Suppress vendor assertions in Sanitize builds via target-scoped NDEBUG — cute_aseprite.h has false assertion on valid .ase user data chunks"
   - "Keep RelWithDebInfo build as opt-in via rake cmake:build — preserves escape hatch if sanitizer overhead is prohibitive"
   - "Pass ASAN_OPTIONS=halt_on_error=1 in rake run — crash immediately on first violation rather than accumulating reports"
 
@@ -56,8 +60,8 @@ completed: 2026-03-18
 - **Duration:** ~8 min
 - **Started:** 2026-03-18T18:12:00Z
 - **Completed:** 2026-03-18T18:21:00Z
-- **Tasks:** 1/2 complete (Task 2 awaiting human verification)
-- **Files modified:** 2
+- **Tasks:** 2/2 complete
+- **Files modified:** 3 (CMakeLists.txt, Rakefile, sanitizer-ignorelist.txt)
 
 ## Accomplishments
 
@@ -73,18 +77,21 @@ completed: 2026-03-18
 Each task was committed atomically:
 
 1. **Task 1: Add Sanitize CMake build type and update Rakefile defaults** - `4895803` (feat)
-
-**Plan metadata:** pending (will be committed after Task 2 checkpoint)
+2. **Task 2: Verify Sanitize build runs without false-positive crashes** - `43f8b2c` (fix: vendor false positives resolved)
 
 ## Files Created/Modified
 
-- `CMakeLists.txt` - Added Sanitize build type cache variables, updated DEBUG generator expression
-- `Rakefile` - Added cmake:sanitize namespace, updated default/build/run/watch tasks
+- `CMakeLists.txt` - Sanitize build type flags, ignorelist, vendor NDEBUG, vptr exclusion
+- `Rakefile` - cmake:sanitize namespace, default/build/run/watch tasks use Sanitize
+- `sanitizer-ignorelist.txt` - Excludes vendor/, Xcode SDK, Homebrew paths from UBSan
 
 ## Decisions Made
 
-- Disable `CF_CUTE_SHADERC=OFF` and `CF_RUNTIME_SHADER_COMPILATION=OFF` for Sanitize build: pre-compiled C++ static archives (libglslang, SPIRV) in vendor don't carry matching RTTI symbols when linked with ASan, causing typeinfo link failures. Offline shader tools are not needed during development iteration.
-- Keep RelWithDebInfo as opt-in (via `rake cmake:build`) — not removed, preserved as fallback.
+- Keep CF_CUTE_SHADERC=ON — game needs runtime shader compilation for lighting compute shaders.
+- Disable vptr UBSan check for C++ — cute_framework uses -fno-rtti, incompatible with vptr.
+- Add sanitizer ignorelist for vendor/ and system headers — eliminates CF_OFFSET_OF false positives.
+- Suppress vendor assertions via target-scoped NDEBUG — cute_aseprite.h bug on valid .ase files.
+- Keep RelWithDebInfo as opt-in (via `rake cmake:build`) — preserved as fallback.
 - `halt_on_error=1` chosen over accumulate mode: cleaner crash reports, stops at first violation.
 
 ## Deviations from Plan
@@ -114,10 +121,10 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- Sanitize build is configured and compiles successfully
-- Human verification (Task 2) needed: run `rake run` and confirm game launches without ASan crashes
-- If verification passes: CORR-08 requirement satisfied, Phase 01 can proceed to Plan 02
-- If ASan violations appear: debug output will be in terminal after game exit; use `ASAN_SYMBOLIZER_PATH=$(xcrun --find llvm-symbolizer)` for better stack traces
+- Sanitize build verified — game runs cleanly under ASan/UBSan
+- CORR-08 requirement satisfied, ready for Plan 02 (static analysis tasks)
+- compile_commands.json points to sanitize build for clang-tidy
+- RelWithDebInfo preserved as opt-in via `rake cmake:build`
 
 ---
 *Phase: 01-audit-toolchain*
