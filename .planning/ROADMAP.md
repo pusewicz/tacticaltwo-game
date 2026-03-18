@@ -35,7 +35,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A `Sanitize` CMake build type exists that instruments both the host executable and `libgame.dylib` with ASan and UBSan
   4. The game launches and runs under the `Sanitize` build without immediate false-positive crashes
   5. `.clang-tidy` config file is committed alongside `compile_commands.json` generation in the build system
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Add Sanitize CMake build type with ASan/UBSan and make it the default dev build
+- [ ] 01-02-PLAN.md — Add clang-tidy and cppcheck static analysis Rake tasks with baseline reports
 
 ### Phase 2: Coordinate Extraction
 **Goal**: Coordinate conversion lives in exactly one place (`src/game/coords.h`) with zero duplicate definitions remaining in the codebase
@@ -143,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Audit Toolchain | 0/? | Not started | - |
+| 1. Audit Toolchain | 0/2 | Planning complete | - |
 | 2. Coordinate Extraction | 0/? | Not started | - |
 | 3. Null and Zero Guards | 0/? | Not started | - |
 | 4. Asset and LDtk Error Paths | 0/? | Not started | - |
