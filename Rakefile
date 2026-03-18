@@ -21,7 +21,7 @@ namespace :cmake do
       if File.exist?("build/sanitize/build.ninja")
         puts "Sanitize build already configured (build/sanitize/build.ninja exists)"
       else
-        sh "cmake -B build/sanitize -G Ninja -DCMAKE_BUILD_TYPE=Sanitize -DENABLE_HOT_RELOADING=ON -DCF_CUTE_SHADERC=OFF -DCF_RUNTIME_SHADER_COMPILATION=OFF"
+        sh "cmake -B build/sanitize -G Ninja -DCMAKE_BUILD_TYPE=Sanitize -DENABLE_HOT_RELOADING=ON"
       end
       # Retarget compile_commands.json symlink to sanitize build
       symlink_target = "build/sanitize/compile_commands.json"

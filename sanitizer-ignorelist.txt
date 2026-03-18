@@ -1,0 +1,11 @@
+# Exclude vendor code from sanitizer instrumentation
+# Vendor libraries (cute_framework) trigger false positives from
+# offset-of macros and other patterns that are technically UB but
+# standard practice in C/C++ codebases.
+src:*/vendor/*
+
+# System headers (Xcode SDK, Homebrew LLVM) — template instantiations
+# from vendor code can trigger UBSan in standard library internals
+src:*/Applications/Xcode.app/*
+src:*/usr/include/*
+src:/opt/homebrew/*

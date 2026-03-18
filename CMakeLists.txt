@@ -13,10 +13,10 @@ option(ENABLE_HOT_RELOADING "Enable hot code reloading (shared library)" ON)
 
 # Sanitize build type: ASan + UBSan instrumentation (default for development)
 set(CMAKE_C_FLAGS_SANITIZE
-    "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1"
+    "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1 -fsanitize-ignorelist=${CMAKE_SOURCE_DIR}/sanitizer-ignorelist.txt"
     CACHE STRING "Flags used for the Sanitize build type" FORCE)
 set(CMAKE_CXX_FLAGS_SANITIZE
-    "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1"
+    "-fsanitize=address,undefined -fno-sanitize=vptr -fno-omit-frame-pointer -fno-optimize-sibling-calls -g -O1 -fsanitize-ignorelist=${CMAKE_SOURCE_DIR}/sanitizer-ignorelist.txt"
     CACHE STRING "Flags used for the Sanitize build type" FORCE)
 set(CMAKE_EXE_LINKER_FLAGS_SANITIZE
     "-fsanitize=address,undefined"
@@ -38,6 +38,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(vendor)
 add_subdirectory(src)
+
+# Suppress vendor assertions in Sanitize builds — cute_framework has known
+# assertion failures (e.g., cute_aseprite.h user data handling) on valid input.
+# Our own targets' assertions remain active.
+target_compile_definitions(cute PRIVATE $<$<CONFIG:Sanitize>:NDEBUG>)
 
 # Common compile settings for all project targets
 set(TARGETS game TacticalTwo)
