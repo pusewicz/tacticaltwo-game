@@ -15,7 +15,7 @@ Requirements for this refactoring milestone. Each maps to roadmap phases.
 - [ ] **CORR-04**: Add bounds check to LDtk CSV parser (`parse_csv`) before `grid[idx]` write — validate parsed dimensions match expected grid size
 - [ ] **CORR-05**: Add unified error paths for asset load failures in `init_world` — explicit validity checks and fail-fast on critical assets
 - [ ] **CORR-06**: Add null check after rain arena allocation in `rain_init` — log error and disable rain if allocation fails
-- [ ] **CORR-07**: Set up clang-tidy configuration with `compile_commands.json` and cppcheck for static analysis
+- [x] **CORR-07**: Set up clang-tidy configuration with `compile_commands.json` and cppcheck for static analysis
 - [ ] **CORR-08**: Add ASan/UBSan Sanitize CMake build type with full instrumentation of host and shared library
 
 ### Entity System
@@ -80,7 +80,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORR-04 | Phase 4 | Pending |
 | CORR-05 | Phase 4 | Pending |
 | CORR-06 | Phase 3 | Pending |
-| CORR-07 | Phase 1 | Pending |
+| CORR-07 | Phase 1 | Complete |
 | CORR-08 | Phase 1 | Pending |
 | ENTS-01 | Phase 6 | Pending |
 | ENTS-02 | Phase 5 | Pending |

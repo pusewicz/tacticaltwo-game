@@ -12,7 +12,7 @@ This milestone transforms TacticalTwo's organically-grown codebase into a clean,
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Audit Toolchain** - Wire up clang-tidy, cppcheck, and ASan/UBSan so every subsequent change has a static and runtime validation baseline
+- [x] **Phase 1: Audit Toolchain** - Wire up clang-tidy, cppcheck, and ASan/UBSan so every subsequent change has a static and runtime validation baseline (completed 2026-03-19)
 - [ ] **Phase 2: Coordinate Extraction** - Atomically extract duplicated coordinate conversion math into `src/game/coords.h`, removing both copies from physics and render systems
 - [ ] **Phase 3: Null and Zero Guards** - Harden parallax render, composite canvas, and rain arena against null/zero-dimension inputs
 - [ ] **Phase 4: Asset and LDtk Error Paths** - Add bounds check to CSV parser and unified fail-fast error handling for critical asset loads
@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A `Sanitize` CMake build type exists that instruments both the host executable and `libgame.dylib` with ASan and UBSan
   4. The game launches and runs under the `Sanitize` build without immediate false-positive crashes
   5. `.clang-tidy` config file is committed alongside `compile_commands.json` generation in the build system
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 01-01-PLAN.md — Add Sanitize CMake build type with ASan/UBSan and make it the default dev build
 - [ ] 01-02-PLAN.md — Add clang-tidy and cppcheck static analysis Rake tasks with baseline reports
@@ -146,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Audit Toolchain | 1/2 | In Progress|  |
+| 1. Audit Toolchain | 2/2 | Complete   | 2026-03-19 |
 | 2. Coordinate Extraction | 0/? | Not started | - |
 | 3. Null and Zero Guards | 0/? | Not started | - |
 | 4. Asset and LDtk Error Paths | 0/? | Not started | - |
